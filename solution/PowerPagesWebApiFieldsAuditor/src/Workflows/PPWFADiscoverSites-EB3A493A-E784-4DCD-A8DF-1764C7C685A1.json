@@ -1,0 +1,223 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "ppwfa_sharedcommondataserviceforapps"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "targetEnvironment": {
+                  "title": "targetEnvironment",
+                  "type": "string",
+                  "description": "targetEnvironment",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "targetEnvironment"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "List_Enhanced_And_Code_Sites": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('powerpa','gesites')",
+              "$select": "powerpagesiteid,name,primarydomainname"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Sites": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_we','bsites')",
+              "$select": "adx_websiteid,adx_name,adx_primarydomainname"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Sites": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_w','ebsites')",
+              "$select": "mspp_websiteid,mspp_name,mspp_primarydomainname"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "Respond_to_Power_App": {
+          "runAfter": {
+            "List_Enhanced_And_Code_Sites": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Sites": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Sites": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          },
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "enhancedAndCodeSitesJson": "@{if(equals(actions('List_Enhanced_And_Code_Sites')?['status'],'Succeeded'),string(body('List_Enhanced_And_Code_Sites')?['value']),'[]')}",
+              "standardSitesJson": "@{if(equals(actions('List_Standard_Sites')?['status'],'Succeeded'),string(body('List_Standard_Sites')?['value']),'[]')}",
+              "modernSitesJson": "@{if(equals(actions('List_Modern_Sites')?['status'],'Succeeded'),string(body('List_Modern_Sites')?['value']),'[]')}",
+              "enhancedStatus": "@{actions('List_Enhanced_And_Code_Sites')?['status']}",
+              "enhancedErrorCode": "@{coalesce(actions('List_Enhanced_And_Code_Sites')?['outputs']?['body']?['error']?['code'],'')}",
+              "enhancedErrorMessage": "@{coalesce(actions('List_Enhanced_And_Code_Sites')?['outputs']?['body']?['error']?['message'],'')}",
+              "standardStatus": "@{actions('List_Standard_Sites')?['status']}",
+              "standardErrorCode": "@{coalesce(actions('List_Standard_Sites')?['outputs']?['body']?['error']?['code'],'')}",
+              "standardErrorMessage": "@{coalesce(actions('List_Standard_Sites')?['outputs']?['body']?['error']?['message'],'')}",
+              "modernStatus": "@{actions('List_Modern_Sites')?['status']}",
+              "modernErrorCode": "@{coalesce(actions('List_Modern_Sites')?['outputs']?['body']?['error']?['code'],'')}",
+              "modernErrorMessage": "@{coalesce(actions('List_Modern_Sites')?['outputs']?['body']?['error']?['message'],'')}"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "enhancedAndCodeSitesJson": {
+                  "title": "enhancedAndCodeSitesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardSitesJson": {
+                  "title": "standardSitesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernSitesJson": {
+                  "title": "modernSitesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "enhancedStatus": {
+                  "title": "enhancedStatus",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "enhancedErrorCode": {
+                  "title": "enhancedErrorCode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "enhancedErrorMessage": {
+                  "title": "enhancedErrorMessage",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardStatus": {
+                  "title": "standardStatus",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardErrorCode": {
+                  "title": "standardErrorCode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardErrorMessage": {
+                  "title": "standardErrorMessage",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernStatus": {
+                  "title": "modernStatus",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernErrorCode": {
+                  "title": "modernErrorCode",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernErrorMessage": {
+                  "title": "modernErrorMessage",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

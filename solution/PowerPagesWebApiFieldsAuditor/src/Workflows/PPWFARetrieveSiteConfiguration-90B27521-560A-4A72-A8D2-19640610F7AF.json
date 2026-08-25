@@ -1,0 +1,850 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "ppwfa_sharedcommondataserviceforapps"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "targetEnvironment": {
+                  "title": "targetEnvironment",
+                  "type": "string",
+                  "description": "targetEnvironment",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "siteId": {
+                  "title": "siteId",
+                  "type": "string",
+                  "description": "siteId",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "modelKind": {
+                  "title": "modelKind",
+                  "type": "string",
+                  "description": "modelKind",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "targetEnvironment",
+                "siteId",
+                "modelKind"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "List_Enhanced_Components": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('powerpage','components')",
+              "$select": "powerpagecomponentid,name,powerpagecomponenttype,content",
+              "$filter": "_powerpagesiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Settings": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_site','settings')",
+              "$select": "adx_sitesettingid,adx_name,adx_value",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Web_Pages": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_we','bpages')",
+              "$select": "adx_webpageid,adx_name,adx_copy,adx_customjavascript,adx_customcss",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Web_Templates": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_webt','emplates')",
+              "$select": "adx_webtemplateid,adx_name,adx_source",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Basic_Forms": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_ent','ityforms')",
+              "$select": "adx_entityformid,adx_name,adx_registerstartupscript",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Multistep_Forms": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_we','bforms')",
+              "$select": "adx_webformid,adx_name",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Multistep_Form_Steps": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_webf','ormsteps')",
+              "$select": "adx_webformstepid,adx_name,adx_registerstartupscript,_adx_webform_value"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Content_Snippets": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_conte','ntsnippets')",
+              "$select": "adx_contentsnippetid,adx_name,adx_value",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Web_Files": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_we','bfiles')",
+              "$select": "adx_webfileid,adx_name,adx_partialurl",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Table_Permissions": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_entity','permissions')",
+              "$select": "adx_entitypermissionid,adx_entitylogicalname,adx_entityname,adx_scope,adx_read,adx_write,adx_create,adx_delete,adx_append,adx_appendto,_adx_parententitypermission_value",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Web_Roles": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_we','broles')",
+              "$select": "adx_webroleid,adx_name,adx_anonymoususersrole",
+              "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Standard_Permission_Roles": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('adx_entitypermi','ssion_webroleset')",
+              "$select": "adx_entitypermissionid,adx_webroleid"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Settings": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_sit','esettings')",
+              "$select": "mspp_sitesettingid,mspp_name,mspp_value",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Web_Pages": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_w','ebpages')",
+              "$select": "mspp_webpageid,mspp_name,mspp_copy,mspp_customjavascript,mspp_customcss",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Web_Templates": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_web','templates')",
+              "$select": "mspp_webtemplateid,mspp_name,mspp_source",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Basic_Forms": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_ent','ityforms')",
+              "$select": "mspp_entityformid,mspp_name,mspp_registerstartupscript",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Multistep_Forms": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_w','ebforms')",
+              "$select": "mspp_webformid,mspp_name",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Multistep_Form_Steps": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_web','formsteps')",
+              "$select": "mspp_webformstepid,mspp_name,mspp_registerstartupscript,_mspp_webform_value"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Content_Snippets": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_conte','ntsnippets')",
+              "$select": "mspp_contentsnippetid,mspp_name,mspp_value",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Web_Files": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_w','ebfiles')",
+              "$select": "mspp_webfileid,mspp_name,mspp_partialurl",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Table_Permissions": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_entity','permissions')",
+              "$select": "mspp_entitypermissionid,mspp_entitylogicalname,mspp_entityname,mspp_scope,mspp_read,mspp_write,mspp_create,mspp_delete,mspp_append,mspp_appendto,_mspp_parententitypermission_value",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Web_Roles": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_w','ebroles')",
+              "$select": "mspp_webroleid,mspp_name,mspp_anonymoususersrole",
+              "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "List_Modern_Permission_Roles": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecordsWithOrganization",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "organization": "@triggerBody()?['targetEnvironment']",
+              "entityName": "@concat('mspp_entitypermi','ssion_webroleset')",
+              "$select": "mspp_entitypermissionid,mspp_webroleid"
+            },
+            "authentication": {
+              "type": "Raw",
+              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+            }
+          }
+        },
+        "Respond_to_Power_App": {
+          "runAfter": {
+            "List_Enhanced_Components": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Settings": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Web_Pages": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Web_Templates": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Basic_Forms": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Multistep_Forms": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Multistep_Form_Steps": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Content_Snippets": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Web_Files": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Table_Permissions": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Web_Roles": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Standard_Permission_Roles": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Settings": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Web_Pages": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Web_Templates": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Basic_Forms": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Multistep_Forms": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Multistep_Form_Steps": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Content_Snippets": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Web_Files": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Table_Permissions": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Web_Roles": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ],
+            "List_Modern_Permission_Roles": [
+              "Succeeded",
+              "Failed",
+              "TimedOut",
+              "Skipped"
+            ]
+          },
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "retrievalDiagnostics": "@{concat('List_Enhanced_Components=',actions('List_Enhanced_Components')?['status'],';','List_Standard_Settings=',actions('List_Standard_Settings')?['status'],';','List_Standard_Web_Pages=',actions('List_Standard_Web_Pages')?['status'],';','List_Standard_Web_Templates=',actions('List_Standard_Web_Templates')?['status'],';','List_Standard_Basic_Forms=',actions('List_Standard_Basic_Forms')?['status'],';','List_Standard_Multistep_Forms=',actions('List_Standard_Multistep_Forms')?['status'],';','List_Standard_Multistep_Form_Steps=',actions('List_Standard_Multistep_Form_Steps')?['status'],';','List_Standard_Content_Snippets=',actions('List_Standard_Content_Snippets')?['status'],';','List_Standard_Web_Files=',actions('List_Standard_Web_Files')?['status'],';','List_Standard_Table_Permissions=',actions('List_Standard_Table_Permissions')?['status'],';','List_Standard_Web_Roles=',actions('List_Standard_Web_Roles')?['status'],';','List_Standard_Permission_Roles=',actions('List_Standard_Permission_Roles')?['status'],';','List_Modern_Settings=',actions('List_Modern_Settings')?['status'],';','List_Modern_Web_Pages=',actions('List_Modern_Web_Pages')?['status'],';','List_Modern_Web_Templates=',actions('List_Modern_Web_Templates')?['status'],';','List_Modern_Basic_Forms=',actions('List_Modern_Basic_Forms')?['status'],';','List_Modern_Multistep_Forms=',actions('List_Modern_Multistep_Forms')?['status'],';','List_Modern_Multistep_Form_Steps=',actions('List_Modern_Multistep_Form_Steps')?['status'],';','List_Modern_Content_Snippets=',actions('List_Modern_Content_Snippets')?['status'],';','List_Modern_Web_Files=',actions('List_Modern_Web_Files')?['status'],';','List_Modern_Table_Permissions=',actions('List_Modern_Table_Permissions')?['status'],';','List_Modern_Web_Roles=',actions('List_Modern_Web_Roles')?['status'],';','List_Modern_Permission_Roles=',actions('List_Modern_Permission_Roles')?['status'],';')}",
+              "enhancedComponentsJson": "@{if(equals(actions('List_Enhanced_Components')?['status'],'Succeeded'),string(body('List_Enhanced_Components')?['value']),'[]')}",
+              "standardSettingsJson": "@{if(equals(actions('List_Standard_Settings')?['status'],'Succeeded'),string(body('List_Standard_Settings')?['value']),'[]')}",
+              "standardWebPagesJson": "@{if(equals(actions('List_Standard_Web_Pages')?['status'],'Succeeded'),string(body('List_Standard_Web_Pages')?['value']),'[]')}",
+              "standardWebTemplatesJson": "@{if(equals(actions('List_Standard_Web_Templates')?['status'],'Succeeded'),string(body('List_Standard_Web_Templates')?['value']),'[]')}",
+              "standardBasicFormsJson": "@{if(equals(actions('List_Standard_Basic_Forms')?['status'],'Succeeded'),string(body('List_Standard_Basic_Forms')?['value']),'[]')}",
+              "standardMultistepFormsJson": "@{if(equals(actions('List_Standard_Multistep_Forms')?['status'],'Succeeded'),string(body('List_Standard_Multistep_Forms')?['value']),'[]')}",
+              "standardMultistepFormStepsJson": "@{if(equals(actions('List_Standard_Multistep_Form_Steps')?['status'],'Succeeded'),string(body('List_Standard_Multistep_Form_Steps')?['value']),'[]')}",
+              "standardContentSnippetsJson": "@{if(equals(actions('List_Standard_Content_Snippets')?['status'],'Succeeded'),string(body('List_Standard_Content_Snippets')?['value']),'[]')}",
+              "standardWebFilesJson": "@{if(equals(actions('List_Standard_Web_Files')?['status'],'Succeeded'),string(body('List_Standard_Web_Files')?['value']),'[]')}",
+              "standardPermissionsJson": "@{if(equals(actions('List_Standard_Table_Permissions')?['status'],'Succeeded'),string(body('List_Standard_Table_Permissions')?['value']),'[]')}",
+              "standardRolesJson": "@{if(equals(actions('List_Standard_Web_Roles')?['status'],'Succeeded'),string(body('List_Standard_Web_Roles')?['value']),'[]')}",
+              "standardPermissionRolesJson": "@{if(equals(actions('List_Standard_Permission_Roles')?['status'],'Succeeded'),string(body('List_Standard_Permission_Roles')?['value']),'[]')}",
+              "modernSettingsJson": "@{if(equals(actions('List_Modern_Settings')?['status'],'Succeeded'),string(body('List_Modern_Settings')?['value']),'[]')}",
+              "modernWebPagesJson": "@{if(equals(actions('List_Modern_Web_Pages')?['status'],'Succeeded'),string(body('List_Modern_Web_Pages')?['value']),'[]')}",
+              "modernWebTemplatesJson": "@{if(equals(actions('List_Modern_Web_Templates')?['status'],'Succeeded'),string(body('List_Modern_Web_Templates')?['value']),'[]')}",
+              "modernBasicFormsJson": "@{if(equals(actions('List_Modern_Basic_Forms')?['status'],'Succeeded'),string(body('List_Modern_Basic_Forms')?['value']),'[]')}",
+              "modernMultistepFormsJson": "@{if(equals(actions('List_Modern_Multistep_Forms')?['status'],'Succeeded'),string(body('List_Modern_Multistep_Forms')?['value']),'[]')}",
+              "modernMultistepFormStepsJson": "@{if(equals(actions('List_Modern_Multistep_Form_Steps')?['status'],'Succeeded'),string(body('List_Modern_Multistep_Form_Steps')?['value']),'[]')}",
+              "modernContentSnippetsJson": "@{if(equals(actions('List_Modern_Content_Snippets')?['status'],'Succeeded'),string(body('List_Modern_Content_Snippets')?['value']),'[]')}",
+              "modernWebFilesJson": "@{if(equals(actions('List_Modern_Web_Files')?['status'],'Succeeded'),string(body('List_Modern_Web_Files')?['value']),'[]')}",
+              "modernPermissionsJson": "@{if(equals(actions('List_Modern_Table_Permissions')?['status'],'Succeeded'),string(body('List_Modern_Table_Permissions')?['value']),'[]')}",
+              "modernRolesJson": "@{if(equals(actions('List_Modern_Web_Roles')?['status'],'Succeeded'),string(body('List_Modern_Web_Roles')?['value']),'[]')}",
+              "modernPermissionRolesJson": "@{if(equals(actions('List_Modern_Permission_Roles')?['status'],'Succeeded'),string(body('List_Modern_Permission_Roles')?['value']),'[]')}"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "retrievalDiagnostics": {
+                  "title": "retrievalDiagnostics",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "enhancedComponentsJson": {
+                  "title": "enhancedComponentsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardSettingsJson": {
+                  "title": "standardSettingsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardWebPagesJson": {
+                  "title": "standardWebPagesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardWebTemplatesJson": {
+                  "title": "standardWebTemplatesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardBasicFormsJson": {
+                  "title": "standardBasicFormsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardMultistepFormsJson": {
+                  "title": "standardMultistepFormsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardMultistepFormStepsJson": {
+                  "title": "standardMultistepFormStepsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardContentSnippetsJson": {
+                  "title": "standardContentSnippetsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardWebFilesJson": {
+                  "title": "standardWebFilesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardPermissionsJson": {
+                  "title": "standardPermissionsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardRolesJson": {
+                  "title": "standardRolesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "standardPermissionRolesJson": {
+                  "title": "standardPermissionRolesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernSettingsJson": {
+                  "title": "modernSettingsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernWebPagesJson": {
+                  "title": "modernWebPagesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernWebTemplatesJson": {
+                  "title": "modernWebTemplatesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernBasicFormsJson": {
+                  "title": "modernBasicFormsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernMultistepFormsJson": {
+                  "title": "modernMultistepFormsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernMultistepFormStepsJson": {
+                  "title": "modernMultistepFormStepsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernContentSnippetsJson": {
+                  "title": "modernContentSnippetsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernWebFilesJson": {
+                  "title": "modernWebFilesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernPermissionsJson": {
+                  "title": "modernPermissionsJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernRolesJson": {
+                  "title": "modernRolesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "modernPermissionRolesJson": {
+                  "title": "modernPermissionRolesJson",
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

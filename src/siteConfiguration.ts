@@ -1,0 +1,311 @@
+import { analyzeSite, type SourceFile, type SiteSetting, type TableFinding } from './auditor'
+
+export type SiteModel = 'Standard' | 'Enhanced' | 'Modern'
+
+export interface SiteConfigurationPayload {
+  retrievaldiagnostics?: string
+  enhancedcomponentsjson?: string
+  standardsettingsjson?: string
+  standardwebpagesjson?: string
+  standardwebtemplatesjson?: string
+  standardbasicformsjson?: string
+  standardmultistepformsjson?: string
+  standardmultistepformstepsjson?: string
+  standardcontentsnippetsjson?: string
+  standardwebfilesjson?: string
+  modernsettingsjson?: string
+  modernwebpagesjson?: string
+  modernwebtemplatesjson?: string
+  modernbasicformsjson?: string
+  modernmultistepformsjson?: string
+  modernmultistepformstepsjson?: string
+  moderncontentsnippetsjson?: string
+  modernwebfilesjson?: string
+  standardpermissionsjson?: string
+  modernpermissionsjson?: string
+  standardrolesjson?: string
+  modernrolesjson?: string
+  standardpermissionrolesjson?: string
+  modernpermissionrolesjson?: string
+}
+
+export interface AnonymousPermissionFinding {
+  permissionName: string
+  permissionRecordId: string
+  permissionRecordEntity: 'adx_entitypermission' | 'mspp_entitypermission' | 'powerpagecomponent'
+  table: string
+  scope: string
+  privileges: string[]
+  roleName: string
+  inherited: boolean
+}
+
+export interface SiteAnalysis {
+  findings: TableFinding[]
+  anonymousPermissionFindings: AnonymousPermissionFinding[]
+  sourceCount: number
+  completenessBlockers: string[]
+}
+
+export interface RetrievedCodeFile {
+  id: string
+  name: string
+  content: string
+}
+
+export function parseRows(value?: string): Record<string, unknown>[] {
+  if (!value) return []
+  const parsed: unknown = JSON.parse(value)
+  if (Array.isArray(parsed)) return parsed as Record<string, unknown>[]
+  if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { value?: unknown }).value)) {
+    return (parsed as { value: Record<string, unknown>[] }).value
+  }
+  return []
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function parseContent(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'string' || !value.trim()) return {}
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function addTextFields(files: SourceFile[], row: Record<string, unknown>, path: string, fields: string[], recordEntity?: string, recordId?: string) {
+  for (const field of fields) {
+    const content = text(row[field])
+    if (content) files.push({ path: `${path}/${field}`, content, recordEntity, recordId })
+  }
+}
+
+function childRows(payload: SiteConfigurationPayload, parentPayload: keyof SiteConfigurationPayload, childPayload: keyof SiteConfigurationPayload, parentId: string, childParentIds: string[]) {
+  const parentIds = new Set(parseRows(payload[parentPayload]).map((row) => text(row[parentId])).filter(Boolean))
+  return parseRows(payload[childPayload]).filter((row) => childParentIds.some((field) => parentIds.has(text(row[field]))))
+}
+
+function boolean(value: unknown): boolean {
+  return value === true || value === 1 || value === 'true'
+}
+
+function privileges(record: Record<string, unknown>, prefix = ''): string[] {
+  return ['read', 'write', 'create', 'delete', 'append', 'appendto']
+    .filter((name) => boolean(record[`${prefix}${name}`]))
+    .map((name) => name === 'appendto' ? 'Append To' : `${name[0].toUpperCase()}${name.slice(1)}`)
+}
+
+function scopeName(value: unknown): string {
+  const scopes: Record<string, string> = {
+    '756150000': 'Global',
+    '756150001': 'Contact',
+    '756150002': 'Account',
+    '756150003': 'Parent',
+    '756150004': 'Self',
+  }
+  return scopes[String(value)] ?? String(value || 'Unknown')
+}
+
+function standardAnonymousPermissions(
+  model: 'Standard' | 'Modern',
+  rows: Record<string, unknown>[],
+  roles: Record<string, unknown>[],
+  assignments: Record<string, unknown>[],
+): AnonymousPermissionFinding[] {
+  const prefix = model === 'Standard' ? 'adx_' : 'mspp_'
+  const idProperty = `${prefix}entitypermissionid`
+  const roleIdProperty = `${prefix}webroleid`
+  const parentProperty = `_${prefix}parententitypermission_value`
+  const anonymousByPermission = new Map<string, string>()
+  const recordsById = new Map(rows.map((row) => [text(row[idProperty]).toLowerCase(), row]))
+  const anonymousRoles = new Map(roles
+    .filter((role) => boolean(role[`${prefix}anonymoususersrole`]))
+    .map((role) => [text(role[roleIdProperty]).toLowerCase(), text(role[`${prefix}name`]) || 'Anonymous Users']))
+
+  for (const assignment of assignments) {
+    const roleId = text(assignment[roleIdProperty]).toLowerCase()
+    const permissionId = text(assignment[idProperty]).toLowerCase()
+    if (anonymousRoles.has(roleId)) anonymousByPermission.set(permissionId, anonymousRoles.get(roleId) ?? 'Anonymous Users')
+  }
+
+  return rows.flatMap((row) => {
+    const id = text(row[idProperty])
+    let currentId = id.toLowerCase()
+    let roleName = ''
+    let inherited = false
+    const visited = new Set<string>()
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId)
+      roleName = anonymousByPermission.get(currentId) ?? ''
+      if (roleName) break
+      const current = recordsById.get(currentId)
+      currentId = text(current?.[parentProperty]).toLowerCase()
+      inherited = Boolean(currentId)
+    }
+    if (!roleName) return []
+    return [{
+      permissionName: text(row[`${prefix}entityname`]) || 'Unnamed table permission',
+      permissionRecordId: id,
+      permissionRecordEntity: model === 'Standard' ? 'adx_entitypermission' as const : 'mspp_entitypermission' as const,
+      table: text(row[`${prefix}entitylogicalname`]) || text(row[`${prefix}entityname`]) || 'Unknown table',
+      scope: scopeName(row[`${prefix}scope`]),
+      privileges: privileges(row, prefix),
+      roleName,
+      inherited,
+    }]
+  })
+}
+
+function enhancedAnonymousPermissions(rows: Record<string, unknown>[]): AnonymousPermissionFinding[] {
+  const components = rows.map((row) => ({ row, content: parseContent(row.content) }))
+  const anonymousRoles = new Map(components
+    .filter(({ row, content }) => Number(row.powerpagecomponenttype) === 11 && boolean(content.anonymoususersrole))
+    .map(({ row }) => [text(row.powerpagecomponentid).toLowerCase(), text(row.name) || 'Anonymous Users']))
+  const permissions = components.filter(({ row }) => Number(row.powerpagecomponenttype) === 18)
+  const recordsById = new Map(permissions.map((permission) => [text(permission.row.powerpagecomponentid).toLowerCase(), permission]))
+
+  return permissions.flatMap(({ row, content }) => {
+    const id = text(row.powerpagecomponentid)
+    let currentId = id.toLowerCase()
+    let roleName = ''
+    let inherited = false
+    const visited = new Set<string>()
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId)
+      const current = recordsById.get(currentId)
+      const roleIds = Array.isArray(current?.content.adx_entitypermission_webrole) ? current.content.adx_entitypermission_webrole : []
+      const anonymousRoleId = roleIds.map(String).find((roleId) => anonymousRoles.has(roleId.toLowerCase()))
+      if (anonymousRoleId) {
+        roleName = anonymousRoles.get(anonymousRoleId.toLowerCase()) ?? 'Anonymous Users'
+        break
+      }
+      currentId = text(current?.content.parententitypermission).toLowerCase()
+      inherited = Boolean(currentId)
+    }
+    if (!roleName) return []
+    return [{
+      permissionName: text(content.entityname) || text(row.name) || 'Unnamed table permission',
+      permissionRecordId: id,
+      permissionRecordEntity: 'powerpagecomponent' as const,
+      table: text(content.entitylogicalname) || 'Unknown table',
+      scope: scopeName(content.scope),
+      privileges: privileges(content),
+      roleName,
+      inherited,
+    }]
+  })
+}
+
+export function isCodeWebFile(name: string): boolean {
+  return /\.(?:js|mjs|cjs|ts|tsx|jsx|html?|liquid)$/i.test(name.trim())
+}
+
+export function analyzeConfiguration(model: SiteModel, payload: SiteConfigurationPayload, codeFiles: RetrievedCodeFile[] = []): SiteAnalysis {
+  const settings: SiteSetting[] = []
+  const files: SourceFile[] = []
+  const completenessBlockers: string[] = []
+  const componentPermissionFindings = model === 'Enhanced' || model === 'Modern'
+    ? enhancedAnonymousPermissions(parseRows(payload.enhancedcomponentsjson))
+    : []
+  const modernPermissionIds = new Set(parseRows(payload.modernpermissionsjson)
+    .map((row) => text(row.mspp_entitypermissionid).toLowerCase())
+    .filter(Boolean))
+  const navigableComponentPermissionFindings = model === 'Modern'
+    ? componentPermissionFindings.map((finding): AnonymousPermissionFinding => modernPermissionIds.has(finding.permissionRecordId.toLowerCase())
+      ? { ...finding, permissionRecordEntity: 'mspp_entitypermission' }
+      : finding)
+    : componentPermissionFindings
+  const recordPermissionFindings = model === 'Standard' || model === 'Modern'
+    ? standardAnonymousPermissions(
+      model,
+      parseRows(model === 'Standard' ? payload.standardpermissionsjson : payload.modernpermissionsjson),
+      parseRows(model === 'Standard' ? payload.standardrolesjson : payload.modernrolesjson),
+      parseRows(model === 'Standard' ? payload.standardpermissionrolesjson : payload.modernpermissionrolesjson),
+    )
+    : []
+  const anonymousPermissionFindings = [...navigableComponentPermissionFindings, ...recordPermissionFindings]
+    .filter((finding, index, all) => all.findIndex((candidate) => candidate.permissionRecordId.toLowerCase() === finding.permissionRecordId.toLowerCase()) === index)
+  const codeFilesById = new Map(codeFiles.map((file) => [file.id, file]))
+
+  if (model === 'Enhanced') {
+    for (const row of parseRows(payload.enhancedcomponentsjson)) {
+      const content = parseContent(row.content)
+      const componentType = Number(row.powerpagecomponenttype)
+      const name = text(row.name) || `component-${text(row.powerpagecomponentid)}`
+      if (componentType === 9 && text(content.name)) {
+        settings.push({
+          name: text(content.name),
+          value: text(content.value),
+          recordId: text(row.powerpagecomponentid),
+          recordEntity: 'powerpagecomponent',
+        })
+      }
+      if ([2, 7, 8, 15, 20].includes(componentType)) {
+        addTextFields(files, content, name, ['copy', 'customjavascript', 'source', 'registerstartupscript', 'value'], 'powerpagecomponent', text(row.powerpagecomponentid))
+      }
+      if (componentType === 3) {
+        if (!isCodeWebFile(name)) continue
+        const codeFile = codeFilesById.get(text(row.powerpagecomponentid))
+        if (codeFile) files.push({ path: codeFile.name || name, content: codeFile.content, recordEntity: 'powerpagecomponent', recordId: text(row.powerpagecomponentid) })
+        else completenessBlockers.push(`Web file '${name}' was found, but its file-column bytes were not returned by the retrieve flow.`)
+      }
+    }
+  } else if (model === 'Standard') {
+    for (const row of parseRows(payload.standardsettingsjson)) {
+      settings.push({
+        name: text(row.adx_name),
+        value: text(row.adx_value),
+        recordId: text(row.adx_sitesettingid),
+        recordEntity: 'adx_sitesetting',
+      })
+    }
+    parseRows(payload.standardwebpagesjson).forEach((row) => addTextFields(files, row, text(row.adx_name) || 'web-page', ['adx_copy', 'adx_customjavascript', 'adx_customcss'], 'adx_webpage', text(row.adx_webpageid)))
+    parseRows(payload.standardwebtemplatesjson).forEach((row) => addTextFields(files, row, text(row.adx_name) || 'web-template', ['adx_source'], 'adx_webtemplate', text(row.adx_webtemplateid)))
+    parseRows(payload.standardcontentsnippetsjson).forEach((row) => addTextFields(files, row, text(row.adx_name) || 'content-snippet', ['adx_value'], 'adx_contentsnippet', text(row.adx_contentsnippetid)))
+    parseRows(payload.standardbasicformsjson).forEach((row) => addTextFields(files, row, text(row.adx_name) || 'basic-form', ['adx_registerstartupscript'], 'adx_entityform', text(row.adx_entityformid)))
+    childRows(payload, 'standardmultistepformsjson', 'standardmultistepformstepsjson', 'adx_webformid', ['_adx_webform_value', '_adx_webformid_value'])
+      .forEach((row) => addTextFields(files, row, text(row.adx_name) || 'multistep-form-step', ['adx_registerstartupscript'], 'adx_webformstep', text(row.adx_webformstepid)))
+    for (const row of parseRows(payload.standardwebfilesjson)) {
+      const id = text(row.adx_webfileid)
+      const name = text(row.adx_partialurl) || text(row.adx_name)
+      if (!isCodeWebFile(name)) continue
+      const codeFile = codeFilesById.get(id)
+      if (codeFile) files.push({ path: codeFile.name || name, content: codeFile.content, recordEntity: 'adx_webfile', recordId: id })
+      else completenessBlockers.push(`Standard web file '${text(row.adx_name) || id}' was found, but its annotation bytes were not returned by the retrieve flow.`)
+    }
+  } else {
+    for (const row of parseRows(payload.modernsettingsjson)) {
+      settings.push({
+        name: text(row.mspp_name),
+        value: text(row.mspp_value),
+        recordId: text(row.mspp_sitesettingid),
+        recordEntity: 'mspp_sitesetting',
+      })
+    }
+    parseRows(payload.modernwebpagesjson).forEach((row) => addTextFields(files, row, text(row.mspp_name) || 'web-page', ['mspp_copy', 'mspp_customjavascript', 'mspp_customcss'], 'mspp_webpage', text(row.mspp_webpageid)))
+    parseRows(payload.modernwebtemplatesjson).forEach((row) => addTextFields(files, row, text(row.mspp_name) || 'web-template', ['mspp_source'], 'mspp_webtemplate', text(row.mspp_webtemplateid)))
+    parseRows(payload.moderncontentsnippetsjson).forEach((row) => addTextFields(files, row, text(row.mspp_name) || 'content-snippet', ['mspp_value'], 'mspp_contentsnippet', text(row.mspp_contentsnippetid)))
+    parseRows(payload.modernbasicformsjson).forEach((row) => addTextFields(files, row, text(row.mspp_name) || 'basic-form', ['mspp_registerstartupscript'], 'mspp_entityform', text(row.mspp_entityformid)))
+    childRows(payload, 'modernmultistepformsjson', 'modernmultistepformstepsjson', 'mspp_webformid', ['_mspp_webform_value', '_mspp_webformid_value'])
+      .forEach((row) => addTextFields(files, row, text(row.mspp_name) || 'multistep-form-step', ['mspp_registerstartupscript'], 'mspp_webformstep', text(row.mspp_webformstepid)))
+    for (const row of parseRows(payload.modernwebfilesjson)) {
+      const id = text(row.mspp_webfileid)
+      const name = text(row.mspp_partialurl) || text(row.mspp_name)
+      if (!isCodeWebFile(name)) continue
+      const codeFile = codeFilesById.get(id)
+      if (codeFile) files.push({ path: codeFile.name || name, content: codeFile.content, recordEntity: 'mspp_webfile', recordId: id })
+      else completenessBlockers.push(`Modern web file '${text(row.mspp_name) || id}' was found, but its annotation bytes were not returned by the retrieve flow.`)
+    }
+  }
+
+  const findings = analyzeSite(settings, files).map((finding) => completenessBlockers.length === 0 ? finding : {
+    ...finding,
+    confidence: 'blocked' as const,
+    blockers: [...finding.blockers, ...completenessBlockers],
+  })
+  return { findings, anonymousPermissionFindings, sourceCount: files.length, completenessBlockers }
+}

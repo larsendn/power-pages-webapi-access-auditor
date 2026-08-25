@@ -1,0 +1,200 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "ppwfa_sharedcommondataserviceforapps"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "targetEnvironment": {
+                  "title": "targetEnvironment",
+                  "type": "string",
+                  "description": "targetEnvironment",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "modelKind": {
+                  "title": "modelKind",
+                  "type": "string",
+                  "description": "modelKind",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "fileId": {
+                  "title": "fileId",
+                  "type": "string",
+                  "description": "fileId",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "fileName": {
+                  "title": "fileName",
+                  "type": "string",
+                  "description": "fileName",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "targetEnvironment",
+                "modelKind",
+                "fileId",
+                "fileName"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Is_Standard_Model": {
+          "runAfter": {},
+          "type": "If",
+          "expression": {
+            "or": [
+              {
+                "equals": [
+                  "@toLower(triggerBody()?['modelKind'])",
+                  "standard"
+                ]
+              },
+              {
+                "equals": [
+                  "@toLower(triggerBody()?['modelKind'])",
+                  "modern"
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "List_Standard_Web_File_Annotations": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecordsWithOrganization",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "organization": "@triggerBody()?['targetEnvironment']",
+                  "entityName": "@concat('annot','ations')",
+                  "$select": "annotationid,filename,documentbody,mimetype",
+                  "$filter": "_objectid_value eq @{triggerBody()?['fileId']} and isdocument eq true"
+                },
+                "authentication": {
+                  "type": "Raw",
+                  "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                }
+              }
+            },
+            "Respond_Standard_Code_File": {
+              "runAfter": {
+                "List_Standard_Web_File_Annotations": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response",
+              "kind": "PowerApp",
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "filesJson": "@{string(body('List_Standard_Web_File_Annotations')?['value'])}"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filesJson": {
+                      "title": "filesJson",
+                      "type": "string",
+                      "x-ms-dynamically-added": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Download_Enhanced_Web_File": {
+                "runAfter": {},
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_commondataserviceforapps",
+                    "operationId": "GetEntityFileImageFieldContentWithOrganization",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                  },
+                  "parameters": {
+                    "organization": "@triggerBody()?['targetEnvironment']",
+                    "entityName": "@concat('powerpage','components')",
+                    "recordId": "@triggerBody()?['fileId']",
+                    "fileImageFieldName": "filecontent",
+                    "Range": "bytes=0-"
+                  },
+                  "authentication": {
+                    "type": "Raw",
+                    "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                  }
+                }
+              },
+              "Respond_Enhanced_Code_File": {
+                "runAfter": {
+                  "Download_Enhanced_Web_File": [
+                    "Succeeded"
+                  ]
+                },
+                "type": "Response",
+                "kind": "PowerApp",
+                "inputs": {
+                  "statusCode": 200,
+                  "body": {
+                    "filesJson": "@{concat('[{\"filename\":\"',replace(triggerBody()?['fileName'],'\"',''), '\",\"documentbody\":\"',base64(body('Download_Enhanced_Web_File')),'\"}]')}"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "filesJson": {
+                        "title": "filesJson",
+                        "type": "string",
+                        "x-ms-dynamically-added": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}

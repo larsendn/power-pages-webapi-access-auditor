@@ -1,0 +1,99 @@
+# Power Pages Wildcard & Anonymous Access Auditor
+
+A Power Apps code app that scans Power Pages sites for:
+
+- Wildcard `Webapi/<table>/fields` site settings.
+- Anonymous table permissions.
+- Static Web API field usage across pages, templates, forms, snippets, and code web files.
+
+The app proposes explicit field allowlists, requires review before applying changes, verifies remote state, and records changes for guarded undo.
+
+## Status
+
+This project is under active development and is currently distributed privately for validation. It is not an official Microsoft product or supported Microsoft offering.
+
+## Architecture
+
+The repository contains:
+
+- A React, TypeScript, Vite, and Fluent UI code app.
+- Seven solution-aware Power Automate cloud flows.
+- A schema-neutral Dataverse integration supporting Standard (`adx_*`), Modern (`mspp_*`), and Enhanced Power Pages models.
+- A hybrid code analyzer using tolerant JavaScript/TypeScript parsing, HTML script extraction, FetchXML analysis, and conservative fallback detection.
+
+Cloud flows use selected-environment Dataverse operations with runtime-derived table names. Customers install one universal solution rather than model-specific packages.
+
+## Security Model
+
+- The Power Automate Management connection determines which environments are discoverable.
+- The Microsoft Dataverse connection performs reads and approved writes.
+- The connection identity must have appropriate access in every selected environment.
+- Production environments are excluded until explicitly included.
+- Scan results and review progress remain in browser-local storage unless exported by the user.
+- Cloud type is not a runtime scan option; compatibility is validated as part of release testing.
+
+Never commit customer scan output, connection exports, access tokens, credentials, or tenant-specific diagnostic logs.
+
+## Local Development
+
+Prerequisites:
+
+- Node.js 20 or later.
+- Microsoft Power Platform CLI.
+- Power Apps Code Apps CLI authentication for Local Play or app push.
+
+Install and validate:
+
+```powershell
+npm ci
+npm test
+npm run lint
+npm run build
+```
+
+Copy `power.config.example.json` to `power.config.json`, then configure it through supported Code Apps CLI commands. `power.config.json` is ignored because it contains environment-specific identifiers.
+
+Start Local Play:
+
+```powershell
+npm run dev -- --host 127.0.0.1 --port 5181
+```
+
+## Solution Build
+
+The authoritative unpacked solution source is:
+
+```text
+solution/PowerPagesWebApiFieldsAuditor/src
+```
+
+Build managed and unmanaged packages:
+
+```powershell
+.\scripts\build-solution-packages.ps1 -Version 1.6.0.4
+```
+
+The build regenerates all seven schema-neutral flow definitions and rejects static Dataverse table bindings. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.
+
+## Release Validation
+
+Every release must pass `npm test`, `npm run lint`, and `npm run build`. Also verify:
+
+- Managed and unmanaged flags are correct.
+- Seven workflow definitions are packaged.
+- No static `entityName` bindings are present.
+- `MissingDependencies` is empty.
+- Commercial, GCC, GCC High, and DoD compatibility is tested in their respective environments.
+- Local Play workflows are tested with an authenticated connection identity.
+
+## Limitations
+
+Static code analysis cannot prove every dynamically constructed request. Unknown wrappers, dynamic table names, or unresolved field construction are surfaced as review blockers rather than treated as safe high-confidence allowlists.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and review expectations. Report security issues using [SECURITY.md](SECURITY.md).
+
+## License
+
+No license has been granted yet. Keep the repository private until ownership and licensing terms are approved.

@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "appId": "YOUR-CODE-APP-ID",
+  "appDisplayName": "Power Pages Wildcard & Anonymous Access Auditor",
+  "region": "YOUR-POWER-APPS-REGION",
+  "appType": "CodeApp",
+  "environmentId": "YOUR-POWER-PLATFORM-ENVIRONMENT-ID",
+  "description": "Audits Power Pages Web API wildcard settings and anonymous table access.",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "localAppUrl": "http://localhost:3000",
+  "logoPath": "Default",
+  "connectionReferences": {},
+  "databaseReferences": {}
+}

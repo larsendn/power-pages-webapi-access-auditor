@@ -1,0 +1,367 @@
+{
+  "properties": {
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "runtimeSource": "embedded",
+        "connection": {
+          "connectionReferenceLogicalName": "ppwfa_sharedcommondataserviceforapps"
+        },
+        "api": {
+          "name": "shared_commondataserviceforapps"
+        }
+      }
+    },
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "targetEnvironment": {
+                  "title": "targetEnvironment",
+                  "type": "string",
+                  "description": "targetEnvironment",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "modelKind": {
+                  "title": "modelKind",
+                  "type": "string",
+                  "description": "modelKind",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "settingId": {
+                  "title": "settingId",
+                  "type": "string",
+                  "description": "settingId",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "settingName": {
+                  "title": "settingName",
+                  "type": "string",
+                  "description": "settingName",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                },
+                "approvedValue": {
+                  "title": "approvedValue",
+                  "type": "string",
+                  "description": "approvedValue",
+                  "x-ms-content-hint": "TEXT",
+                  "x-ms-dynamically-added": true
+                }
+              },
+              "required": [
+                "targetEnvironment",
+                "modelKind",
+                "settingId",
+                "settingName",
+                "approvedValue"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Is_Standard_Model": {
+          "runAfter": {},
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@toLower(triggerBody()?['modelKind'])",
+              "standard"
+            ]
+          },
+          "actions": {
+            "Get_Standard_Setting": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItemWithOrganization",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "organization": "@triggerBody()?['targetEnvironment']",
+                  "entityName": "@concat('adx_site','settings')",
+                  "recordId": "@triggerBody()?['settingId']"
+                },
+                "authentication": {
+                  "type": "Raw",
+                  "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Is_Modern_Setting_Read": {
+                "runAfter": {},
+                "type": "If",
+                "expression": {
+                  "equals": [
+                    "@toLower(triggerBody()?['modelKind'])",
+                    "modern"
+                  ]
+                },
+                "actions": {
+                  "Get_Modern_Setting": {
+                    "runAfter": {},
+                    "type": "OpenApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_commondataserviceforapps",
+                        "operationId": "GetItemWithOrganization",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                      },
+                      "parameters": {
+                        "organization": "@triggerBody()?['targetEnvironment']",
+                        "entityName": "@concat('mspp_sit','esettings')",
+                        "recordId": "@triggerBody()?['settingId']"
+                      },
+                      "authentication": {
+                        "type": "Raw",
+                        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                      }
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Get_Enhanced_Setting": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "GetItemWithOrganization",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "organization": "@triggerBody()?['targetEnvironment']",
+                          "entityName": "@concat('powerpage','components')",
+                          "recordId": "@triggerBody()?['settingId']"
+                        },
+                        "authentication": {
+                          "type": "Raw",
+                          "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Validate_Wildcard_Field_Setting": {
+          "runAfter": {
+            "Is_Standard_Model": [
+              "Succeeded"
+            ]
+          },
+          "type": "If",
+          "expression": "@and(equals(toLower(triggerBody()?['settingName']),toLower(if(equals(toLower(triggerBody()?['modelKind']),'standard'),body('Get_Standard_Setting')?['adx_name'],if(equals(toLower(triggerBody()?['modelKind']),'modern'),body('Get_Modern_Setting')?['mspp_name'],json(body('Get_Enhanced_Setting')?['content'])?['name'])))),equals(length(split(triggerBody()?['settingName'],'/')),3),equals(toLower(first(split(triggerBody()?['settingName'],'/'))),'webapi'),equals(toLower(last(split(triggerBody()?['settingName'],'/'))),'fields'),contains(split(replace(if(equals(toLower(triggerBody()?['modelKind']),'standard'),body('Get_Standard_Setting')?['adx_value'],if(equals(toLower(triggerBody()?['modelKind']),'modern'),body('Get_Modern_Setting')?['mspp_value'],json(body('Get_Enhanced_Setting')?['content'])?['value'])),' ',''),','),'*'),not(contains(triggerBody()?['approvedValue'],'*')),greater(length(trim(triggerBody()?['approvedValue'])),0))",
+          "actions": {
+            "Apply_By_Model": {
+              "runAfter": {},
+              "type": "If",
+              "expression": {
+                "equals": [
+                  "@toLower(triggerBody()?['modelKind'])",
+                  "standard"
+                ]
+              },
+              "actions": {
+                "Update_Standard_Setting": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecordWithOrganization",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "organization": "@triggerBody()?['targetEnvironment']",
+                      "entityName": "@concat('adx_site','settings')",
+                      "recordId": "@triggerBody()?['settingId']",
+                      "item": {
+                        "adx_value": "@triggerBody()?['approvedValue']"
+                      }
+                    },
+                    "authentication": {
+                      "type": "Raw",
+                      "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Is_Modern_Setting_Update": {
+                    "runAfter": {},
+                    "type": "If",
+                    "expression": {
+                      "equals": [
+                        "@toLower(triggerBody()?['modelKind'])",
+                        "modern"
+                      ]
+                    },
+                    "actions": {
+                      "Update_Modern_Setting": {
+                        "runAfter": {},
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "host": {
+                            "connectionName": "shared_commondataserviceforapps",
+                            "operationId": "UpdateOnlyRecordWithOrganization",
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                          },
+                          "parameters": {
+                            "organization": "@triggerBody()?['targetEnvironment']",
+                            "entityName": "@concat('mspp_sit','esettings')",
+                            "recordId": "@triggerBody()?['settingId']",
+                            "item": {
+                              "mspp_value": "@triggerBody()?['approvedValue']"
+                            }
+                          },
+                          "authentication": {
+                            "type": "Raw",
+                            "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                          }
+                        }
+                      }
+                    },
+                    "else": {
+                      "actions": {
+                        "Update_Enhanced_Setting": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "UpdateOnlyRecordWithOrganization",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "organization": "@triggerBody()?['targetEnvironment']",
+                              "entityName": "@concat('powerpage','components')",
+                              "recordId": "@triggerBody()?['settingId']",
+                              "item": {
+                                "content": "@string(setProperty(json(body('Get_Enhanced_Setting')?['content']),'value',triggerBody()?['approvedValue']))"
+                              }
+                            },
+                            "authentication": {
+                              "type": "Raw",
+                              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Respond_Applied": {
+              "runAfter": {
+                "Apply_By_Model": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Response",
+              "kind": "PowerApp",
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "status": "Applied",
+                  "settingId": "@triggerBody()?['settingId']",
+                  "appliedValue": "@triggerBody()?['approvedValue']"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "title": "status",
+                      "type": "string",
+                      "x-ms-dynamically-added": true
+                    },
+                    "settingId": {
+                      "title": "settingId",
+                      "type": "string",
+                      "x-ms-dynamically-added": true
+                    },
+                    "appliedValue": {
+                      "title": "appliedValue",
+                      "type": "string",
+                      "x-ms-dynamically-added": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Respond_Blocked": {
+                "runAfter": {},
+                "type": "Response",
+                "kind": "PowerApp",
+                "inputs": {
+                  "statusCode": 200,
+                  "body": {
+                    "status": "Blocked",
+                    "settingId": "@triggerBody()?['settingId']",
+                    "appliedValue": ""
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "title": "status",
+                        "type": "string",
+                        "x-ms-dynamically-added": true
+                      },
+                      "settingId": {
+                        "title": "settingId",
+                        "type": "string",
+                        "x-ms-dynamically-added": true
+                      },
+                      "appliedValue": {
+                        "title": "appliedValue",
+                        "type": "string",
+                        "x-ms-dynamically-added": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "outputs": {}
+    },
+    "templateName": ""
+  },
+  "schemaVersion": "1.0.0.0"
+}
