@@ -1,18 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <CanvasApp xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Name>ppwfa_powerpageswebapifieldsauditor_7b9ba</Name>
-  <AppVersion>2026-08-25T16:41:32Z</AppVersion>
+  <AppVersion>2026-08-26T17:03:52Z</AppVersion>
   <Status>Ready</Status>
   <CreatedByClientVersion>0.0.0.0</CreatedByClientVersion>
   <MinClientVersion>0.0.0.0</MinClientVersion>
   <Tags>{}</Tags>
   <IsCdsUpgraded>0</IsCdsUpgraded>
-  <GalleryItemId xsi:nil="true"></GalleryItemId>
+  <GalleryItemId xsi:nil="true">
+  </GalleryItemId>
   <BackgroundColor>RGBA(255,255,255,1)</BackgroundColor>
   <DisplayName>Power Pages Wildcard &amp; Anonymous Access Auditor</DisplayName>
-  <Description></Description>
-  <CommitMessage xsi:nil="true"></CommitMessage>
-  <Publisher></Publisher>
+  <Description>
+  </Description>
+  <CommitMessage xsi:nil="true">
+  </CommitMessage>
+  <Publisher>
+  </Publisher>
   <AuthorizationReferences>[]</AuthorizationReferences>
   <ConnectionReferences>{"aad71674-cd70-4786-aed9-15907939df45":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_retrievesiteconfiguration"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"90b27521-560a-4a72-a8d2-19640610f7af"},"workflowDisplayName":{"value":"PPWFA - Retrieve Site Configuration"},"workflowName":{"value":"0f75d9e8-1e10-476f-b932-bd865cdfdcb0"}},"parameterHintsV2":{"workflowEntityId":{"value":"90b27521-560a-4a72-a8d2-19640610f7af"},"workflowDisplayName":{"value":"PPWFA - Retrieve Site Configuration"},"workflowName":{"value":"0f75d9e8-1e10-476f-b932-bd865cdfdcb0"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"93bb1673-e783-47d5-809e-8a4bc0976be3":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_applyapprovedfields"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"7a44b75d-6388-4e32-8849-8ce40acb2a3a"},"workflowDisplayName":{"value":"PPWFA - Apply Approved Fields"},"workflowName":{"value":"d83e33c8-7e6d-4215-84ee-8b9b494ae112"}},"parameterHintsV2":{"workflowEntityId":{"value":"7a44b75d-6388-4e32-8849-8ce40acb2a3a"},"workflowDisplayName":{"value":"PPWFA - Apply Approved Fields"},"workflowName":{"value":"d83e33c8-7e6d-4215-84ee-8b9b494ae112"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"b60115cf-9a26-4731-bdf4-8260530b6537":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_verifyappliedfields"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"3b931685-ce4f-45b1-9f9b-f45df463f34b"},"workflowDisplayName":{"value":"PPWFA - Verify Applied Fields"},"workflowName":{"value":"a047f6db-5c99-4431-8358-a75bf56f5e98"}},"parameterHintsV2":{"workflowEntityId":{"value":"3b931685-ce4f-45b1-9f9b-f45df463f34b"},"workflowDisplayName":{"value":"PPWFA - Verify Applied Fields"},"workflowName":{"value":"a047f6db-5c99-4431-8358-a75bf56f5e98"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"fc18547d-cb7f-456d-a72e-c54a3c36a926":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_discoverenvironments"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"37a35bd1-0bb5-47dd-b5ec-b09265243387"},"workflowDisplayName":{"value":"PPWFA - Discover Environments"},"workflowName":{"value":"efc67eaa-a226-4bfe-b4d8-ef52f8f4a979"}},"parameterHintsV2":{"workflowEntityId":{"value":"37a35bd1-0bb5-47dd-b5ec-b09265243387"},"workflowDisplayName":{"value":"PPWFA - Discover Environments"},"workflowName":{"value":"efc67eaa-a226-4bfe-b4d8-ef52f8f4a979"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"5c182d4a-b7c7-4606-8810-4ffcd0b358c1":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_retrievecodefile"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"f6c3f065-8665-4e54-bad6-902697fb86b5"},"workflowDisplayName":{"value":"PPWFA - Retrieve Code File"},"workflowName":{"value":"385e0a2c-1418-4455-8e50-bf0023181bde"}},"parameterHintsV2":{"workflowEntityId":{"value":"f6c3f065-8665-4e54-bad6-902697fb86b5"},"workflowDisplayName":{"value":"PPWFA - Retrieve Code File"},"workflowName":{"value":"385e0a2c-1418-4455-8e50-bf0023181bde"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"31d226d9-7ad2-46b6-9cb2-6e97cd6dd101":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_restorepreviousfields"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"db39e95e-892b-49c9-ac6a-082f224ec19b"},"workflowDisplayName":{"value":"PPWFA - Restore Previous Fields"},"workflowName":{"value":"bc4773de-1077-4a7a-a66f-1a4eccfbfaff"}},"parameterHintsV2":{"workflowEntityId":{"value":"db39e95e-892b-49c9-ac6a-082f224ec19b"},"workflowDisplayName":{"value":"PPWFA - Restore Previous Fields"},"workflowName":{"value":"bc4773de-1077-4a7a-a66f-1a4eccfbfaff"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]},"795b6bf8-a59b-42e7-82d1-1d7aa50ba465":{"id":"/providers/Microsoft.PowerApps/apis/shared_logicflows","displayName":"Logic flows","iconUri":"https://connectorsiconsfairfax.z5.web.core.usgovcloudapi.net/v1.0.1774/1.0.1774.4397/logicflows/icon.png","dataSources":["ppwfa_discoversites"],"dependencies":[],"dependents":[],"parameterHints":{"workflowEntityId":{"value":"eb3a493a-e784-4dcd-a8df-1764c7c685a1"},"workflowDisplayName":{"value":"PPWFA - Discover Sites"},"workflowName":{"value":"195872bf-9299-4f57-b3f1-9bc766dbb5c6"}},"parameterHintsV2":{"workflowEntityId":{"value":"eb3a493a-e784-4dcd-a8df-1764c7c685a1"},"workflowDisplayName":{"value":"PPWFA - Discover Sites"},"workflowName":{"value":"195872bf-9299-4f57-b3f1-9bc766dbb5c6"}},"isOnPremiseConnection":false,"bypassConsent":false,"dataSets":{},"apiTier":"Standard","actions":[]}}</ConnectionReferences>
   <DatabaseReferences>{}</DatabaseReferences>
@@ -22,15 +26,16 @@
   <CanvasAppType>4</CanvasAppType>
   <BypassConsent>0</BypassConsent>
   <AdminControlBypassConsent>0</AdminControlBypassConsent>
-  <EmbeddedApp xsi:nil="true"></EmbeddedApp>
+  <EmbeddedApp xsi:nil="true">
+  </EmbeddedApp>
   <IntroducedVersion>1.0</IntroducedVersion>
   <CdsDependencies>{"cdsdependencies":[{"dependencyid":"90b27521-560a-4a72-a8d2-19640610f7af","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"7a44b75d-6388-4e32-8849-8ce40acb2a3a","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"3b931685-ce4f-45b1-9f9b-f45df463f34b","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"37a35bd1-0bb5-47dd-b5ec-b09265243387","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"f6c3f065-8665-4e54-bad6-902697fb86b5","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"db39e95e-892b-49c9-ac6a-082f224ec19b","componenttype":29,"componenttypeplatformname":"Workflow"},{"dependencyid":"eb3a493a-e784-4dcd-a8df-1764c7c685a1","componenttype":29,"componenttypeplatformname":"Workflow"}]}</CdsDependencies>
   <IsCustomizable>1</IsCustomizable>
   <CodeAppPackageUris>
-    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/index.html_ContentType_text/html</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-BglzKS43.js_ContentType_application/javascript</CodeAppPackageUri>
     <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-Bx90_skx.css_ContentType_text/css</CodeAppPackageUri>
-    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-EqTGpiPL.js_ContentType_application/javascript</CodeAppPackageUri>
     <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/power-pages-logo-BObTQX_1.png_ContentType_image/png</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/index.html_ContentType_text/html</CodeAppPackageUri>
     <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/vite.svg_ContentType_image/svg+xml</CodeAppPackageUri>
   </CodeAppPackageUris>
 </CanvasApp>

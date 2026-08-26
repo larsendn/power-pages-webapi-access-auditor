@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EnvironmentTarget } from './auditor'
-import { getSiteDiscoveryDiagnostics, hasPowerPagesSites, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
+import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isActiveSiteRecord, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
 
 const environment: EnvironmentTarget = {
   id: 'ENVIRONMENT-1',
@@ -71,5 +71,24 @@ describe('Power Pages presence', () => {
   it('remains compatible with flows that do not return diagnostics', () => {
     expect(getSiteDiscoveryDiagnostics({ standardsitesjson: '[]' })).toEqual([])
     expect(siteDiscoveryFailure({ standardsitesjson: '[]' })).toBe('')
+  })
+})
+
+describe('Power Pages site model discovery', () => {
+  it('deduplicates rows within a model without collapsing migrated models', () => {
+    const modern = claimUniqueSites([{ id: 'SITE-1', model: 'Modern' }, { id: 'site-1', model: 'Modern' }], new Set())
+    const enhanced = claimUniqueSites([{ id: 'site-1', model: 'Enhanced' }, { id: 'site-2', model: 'Enhanced' }], new Set())
+    const standard = claimUniqueSites([{ id: 'SITE-1', model: 'Standard' }, { id: 'site-1', model: 'Standard' }, { id: 'site-3', model: 'Standard' }], new Set())
+
+    expect(modern).toEqual([{ id: 'SITE-1', model: 'Modern' }])
+    expect(enhanced).toEqual([{ id: 'site-1', model: 'Enhanced' }, { id: 'site-2', model: 'Enhanced' }])
+    expect(standard).toEqual([{ id: 'SITE-1', model: 'Standard' }, { id: 'site-3', model: 'Standard' }])
+  })
+
+  it('identifies inactive sites and treats legacy flow rows as active', () => {
+    expect(isActiveSiteRecord({ statecode: 0 })).toBe(true)
+    expect(isActiveSiteRecord({ statecode: '0' })).toBe(true)
+    expect(isActiveSiteRecord({ statecode: 1 })).toBe(false)
+    expect(isActiveSiteRecord({})).toBe(true)
   })
 })

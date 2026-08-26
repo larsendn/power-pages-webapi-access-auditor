@@ -1,5 +1,7 @@
 # Contributing
 
+This is an independent, community-supported project. Contributions are welcome, but review and response times are best effort and no Microsoft support commitment or service-level agreement applies.
+
 ## Development Workflow
 
 1. Create a branch from `main`.
@@ -29,4 +31,4 @@ When changing flow contracts:
 
 ## Licensing
 
-Do not add third-party code or change licensing terms without confirming redistribution rights and project ownership.
+By contributing, you agree that your contribution is licensed under the repository's MIT License. Do not add third-party code unless its license is compatible and redistribution rights are documented.

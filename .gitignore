@@ -1,6 +1,7 @@
 # Logs
 logs
 *.log
+*.har
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -11,6 +12,17 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+
+# Credentials and certificates
+*.key
+*.pem
+*.pfx
+*.p12
+*.cer
+*.crt
 
 # Local Power Apps environment binding
 power.config.json

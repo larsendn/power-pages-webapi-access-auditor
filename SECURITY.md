@@ -4,7 +4,7 @@
 
 Do not open a public issue containing credentials, access tokens, customer environment details, scan results, or exploitable configuration data.
 
-While this repository remains private, report security concerns directly to the repository owner through an approved internal channel. Include the affected version, reproduction steps using non-customer test data, potential impact, and suggested mitigation when known.
+Report security concerns privately through GitHub's private vulnerability reporting for this repository. If that feature is unavailable, contact the repository owner directly rather than opening a public issue. Include the affected version, reproduction steps using non-customer test data, potential impact, and suggested mitigation when known.
 
 ## Sensitive Data
 
@@ -21,4 +21,4 @@ Revoke exposed credentials immediately and remove them from Git history before s
 
 ## Supported Versions
 
-Only the latest private prerelease is actively maintained during validation.
+Only the latest release is eligible for community best-effort security fixes. This project is not covered by Microsoft support or a service-level agreement.

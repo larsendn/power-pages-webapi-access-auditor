@@ -58,3 +58,16 @@ export function hasPowerPagesSites(output: Record<string, unknown>, parseRows: (
   return ['modernsitesjson', 'enhancedandcodesitesjson', 'standardsitesjson']
     .some((key) => parseRows(typeof output[key] === 'string' ? output[key] : undefined).length > 0)
 }
+
+export function claimUniqueSites<T extends { id: string }>(sites: T[], claimedIds: Set<string>): T[] {
+  return sites.filter((site) => {
+    const id = site.id.trim().toLowerCase()
+    if (!id || claimedIds.has(id)) return false
+    claimedIds.add(id)
+    return true
+  })
+}
+
+export function isActiveSiteRecord(row: Record<string, unknown>): boolean {
+  return row.statecode === undefined || Number(row.statecode) === 0
+}

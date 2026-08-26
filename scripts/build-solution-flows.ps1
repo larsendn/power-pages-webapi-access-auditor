@@ -1,6 +1,6 @@
 param(
     [string]$SolutionSource = (Join-Path $PSScriptRoot "..\solution\PowerPagesWebApiFieldsAuditor\src"),
-    [string]$Version = "1.6.0.4"
+    [string]$Version = "1.6.0.12"
 )
 
 $ErrorActionPreference = "Stop"
@@ -279,9 +279,9 @@ $flows.Environments = [ordered]@{
 }
 
 $discoverActions = [ordered]@{}
-Add-ListAction $discoverActions "List_Enhanced_And_Code_Sites" "powerpagesites" "powerpagesiteid,name,primarydomainname" -Organization "@triggerBody()?['targetEnvironment']"
-Add-ListAction $discoverActions "List_Standard_Sites" "adx_websites" "adx_websiteid,adx_name,adx_primarydomainname" -Organization "@triggerBody()?['targetEnvironment']"
-Add-ListAction $discoverActions "List_Modern_Sites" "mspp_websites" "mspp_websiteid,mspp_name,mspp_primarydomainname" -Organization "@triggerBody()?['targetEnvironment']"
+Add-ListAction $discoverActions "List_Enhanced_And_Code_Sites" "powerpagesites" "powerpagesiteid,name,primarydomainname,statecode,statuscode" -Organization "@triggerBody()?['targetEnvironment']"
+Add-ListAction $discoverActions "List_Standard_Sites" "adx_websites" "adx_websiteid,adx_name,adx_primarydomainname,statecode,statuscode" -Organization "@triggerBody()?['targetEnvironment']"
+Add-ListAction $discoverActions "List_Modern_Sites" "mspp_websites" "mspp_websiteid,mspp_name,mspp_primarydomainname,statecode,statuscode" -Organization "@triggerBody()?['targetEnvironment']"
 $discoverActions["Respond_to_Power_App"] = New-ResponseAction -RunAfter ([ordered]@{
     List_Enhanced_And_Code_Sites = @("Succeeded", "Failed", "TimedOut", "Skipped")
     List_Standard_Sites = @("Succeeded", "Failed", "TimedOut", "Skipped")

@@ -12,9 +12,10 @@ import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type Cha
 import { flowErrorMessage } from './errorMessage'
 import { flowGateway } from './flowGateway'
 import { minimumExplicitFields, normalizeExplicitFields } from './approval'
-import { getSiteDiscoveryDiagnostics, hasPowerPagesSites, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
+import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isActiveSiteRecord, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
+import { wildcardFindingKey, withoutNestedSiteAnalysis } from './reviewWorkspace'
 import { analyzeConfiguration, isCodeWebFile, parseRows, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
 import powerPagesLogo from './assets/power-pages-logo.png'
 import './App.css'
@@ -61,11 +62,13 @@ function loadReviewWorkspace(): SavedReviewWorkspace | null {
   }
 }
 
-function saveReviewWorkspace(workspace: SavedReviewWorkspace) {
+function saveReviewWorkspace(workspace: SavedReviewWorkspace): boolean {
   try {
     localStorage.setItem(REVIEW_WORKSPACE_KEY, JSON.stringify(workspace))
+    return true
   } catch (error) {
     debugLogger.error('review.workspace.save-failed', { message: errorMessage(error) })
+    return false
   }
 }
 
@@ -88,6 +91,7 @@ interface PowerPagesSite {
   url: string
   model: SiteModel
   environment: EnvironmentTarget
+  active: boolean
   analysis?: SiteAnalysis
   error?: string
 }
@@ -109,6 +113,12 @@ interface WildcardSiteGroup {
   key: string
   site: PowerPagesSite
   findings: FindingEntry[]
+}
+
+interface AnonymousSiteGroup {
+  key: string
+  site: PowerPagesSite
+  findings: AnonymousFindingEntry[]
 }
 
 interface SavedReviewWorkspace {
@@ -192,6 +202,7 @@ function App() {
   const [powerPagesPresence, setPowerPagesPresence] = useState<Record<string, PowerPagesPresence>>({})
   const [showOnlyPowerPages, setShowOnlyPowerPages] = useState(false)
   const [auditAnonymousAccess, setAuditAnonymousAccess] = useState(true)
+  const [ignoreInactiveSites, setIgnoreInactiveSites] = useState(true)
   const [detectingPowerPages, setDetectingPowerPages] = useState(false)
   const [stoppingDetection, setStoppingDetection] = useState(false)
   const [detectionConcurrency, setDetectionConcurrency] = useState<DetectionConcurrency>(6)
@@ -215,6 +226,7 @@ function App() {
   const [undoMessages, setUndoMessages] = useState<Record<string, string>>({})
   const detectionRun = useRef<{ cancelled: boolean } | null>(null)
   const scanRun = useRef<{ cancelled: boolean } | null>(null)
+  const reviewPersistenceDisabled = useRef(false)
   const undoFileInput = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' })
   const [notice, setNotice] = useState<{ intent: 'info' | 'success' | 'warning' | 'error'; text: string }>({
@@ -256,13 +268,23 @@ function App() {
   const wildcardSiteGroups = useMemo(() => {
     const groups = new Map<string, WildcardSiteGroup>()
     for (const finding of findings) {
-      const key = `${finding.site.environment.id}|${finding.site.id}`
+      const key = `${finding.site.environment.id}|${finding.site.id}|${finding.site.model}`
       const group = groups.get(key)
       if (group) group.findings.push(finding)
       else groups.set(key, { key, site: finding.site, findings: [finding] })
     }
     return [...groups.values()]
   }, [findings])
+  const anonymousSiteGroups = useMemo(() => {
+    const groups = new Map<string, AnonymousSiteGroup>()
+    for (const finding of anonymousFindings) {
+      const key = `${finding.site.environment.id}|${finding.site.id}|${finding.site.model}`
+      const group = groups.get(key)
+      if (group) group.findings.push(finding)
+      else groups.set(key, { key, site: finding.site, findings: [finding] })
+    }
+    return [...groups.values()]
+  }, [anonymousFindings])
   const approvalValue = (finding: FindingEntry) => normalizeExplicitFields(manualValues[finding.key] ?? '') || normalizeExplicitFields(finding.proposedValue) || minimumExplicitFields(finding.table)
   const readyCount = findings.filter((finding) => approvalValue(finding)).length
   const selectedFieldsRequiredCount = findings.filter((finding) => approved.has(finding.key) && !approvalValue(finding)).length
@@ -279,8 +301,8 @@ function App() {
   }, [changeHistory])
 
   useEffect(() => {
-    if (stage !== 'review') return
-    saveReviewWorkspace({
+    if (stage !== 'review' || reviewPersistenceDisabled.current) return
+    const saved = saveReviewWorkspace({
       version: 1,
       savedAt: new Date().toISOString(),
       sites: sites.map((site) => ({
@@ -289,11 +311,12 @@ function App() {
         url: site.url,
         model: site.model,
         environment: site.environment,
+        active: site.active,
         error: site.error,
       })),
-      findings,
-      updatedFindings,
-      anonymousFindings,
+      findings: withoutNestedSiteAnalysis(findings),
+      updatedFindings: withoutNestedSiteAnalysis(updatedFindings),
+      anonymousFindings: withoutNestedSiteAnalysis(anonymousFindings),
       approvedKeys: [...approved],
       manualValues,
       reviewView,
@@ -301,6 +324,13 @@ function App() {
       selectedUpdatedFindingKey,
       selectedAnonymousFindingKey,
     })
+    if (!saved) {
+      reviewPersistenceDisabled.current = true
+      queueMicrotask(() => setNotice({
+          intent: 'warning',
+          text: 'The review is complete, but this browser could not save it for restoration after the app closes. Keep this session open while reviewing the results.',
+        }))
+    }
   }, [anonymousFindings, approved, findings, manualValues, reviewView, selectedAnonymousFindingKey, selectedFindingKey, selectedUpdatedFindingKey, sites, stage, updatedFindings])
 
   async function importUndoCsv(event: React.ChangeEvent<HTMLInputElement>) {
@@ -384,6 +414,7 @@ function App() {
         setPowerPagesPresence({})
         setShowOnlyPowerPages(false)
         setAuditAnonymousAccess(true)
+        setIgnoreInactiveSites(true)
       })
       setNotice(nextEnvironments.length > 0
         ? { intent: 'success', text: `${nextEnvironments.length} accessible Dataverse environment${nextEnvironments.length === 1 ? '' : 's'} found.` }
@@ -551,18 +582,22 @@ function App() {
         debugLogger.info('site.discovery.actions', { environmentId: environment.id, diagnostics: discoveryDiagnostics })
         const discoveryFailure = siteDiscoveryFailure(discovered)
         if (discoveryFailure) throw new Error(discoveryFailure)
-        const modernSites = parseRows(discovered.modernsitesjson).map((row): PowerPagesSite => ({
-          id: text(row.mspp_websiteid), name: text(row.mspp_name) || 'Unnamed site', url: text(row.mspp_primarydomainname), model: 'Modern', environment,
-        }))
-        const modernSiteIds = new Set(modernSites.map((site) => site.id))
-        const enhancedSites = parseRows(discovered.enhancedandcodesitesjson).map((row): PowerPagesSite => ({
-          id: text(row.powerpagesiteid), name: text(row.name) || 'Unnamed site', url: text(row.primarydomainname), model: 'Enhanced', environment,
-        })).filter((site) => !modernSiteIds.has(site.id))
-        const standardSites = parseRows(discovered.standardsitesjson).map((row): PowerPagesSite => ({
-          id: text(row.adx_websiteid), name: text(row.adx_name) || 'Unnamed site', url: text(row.adx_primarydomainname), model: 'Standard', environment,
-        }))
-        debugLogger.info('site.discovery.completed', { environmentId: environment.id, modernSites: modernSites.length, enhancedSites: enhancedSites.length, standardSites: standardSites.length, elapsedMs: Math.round(performance.now() - environmentStartedAt) })
-        for (const site of [...modernSites, ...enhancedSites, ...standardSites].filter((candidate) => candidate.id)) {
+        const modernSiteIds = new Set<string>()
+        const modernSites = claimUniqueSites(parseRows(discovered.modernsitesjson).map((row): PowerPagesSite => ({
+          id: text(row.mspp_websiteid), name: text(row.mspp_name) || 'Unnamed site', url: text(row.mspp_primarydomainname), model: 'Modern', environment, active: isActiveSiteRecord(row),
+        })), modernSiteIds)
+        const enhancedSiteIds = new Set<string>()
+        const enhancedSites = claimUniqueSites(parseRows(discovered.enhancedandcodesitesjson).map((row): PowerPagesSite => ({
+          id: text(row.powerpagesiteid), name: text(row.name) || 'Unnamed site', url: text(row.primarydomainname), model: 'Enhanced', environment, active: isActiveSiteRecord(row),
+        })), enhancedSiteIds)
+        const standardSiteIds = new Set<string>()
+        const standardSites = claimUniqueSites(parseRows(discovered.standardsitesjson).map((row): PowerPagesSite => ({
+          id: text(row.adx_websiteid), name: text(row.adx_name) || 'Unnamed site', url: text(row.adx_primarydomainname), model: 'Standard', environment, active: isActiveSiteRecord(row),
+        })), standardSiteIds)
+        const discoveredSites = [...modernSites, ...enhancedSites, ...standardSites].filter((candidate) => candidate.id)
+        const sitesToScan = ignoreInactiveSites ? discoveredSites.filter((site) => site.active) : discoveredSites
+        debugLogger.info('site.discovery.completed', { environmentId: environment.id, modernSites: modernSites.length, enhancedSites: enhancedSites.length, standardSites: standardSites.length, inactiveSitesIgnored: discoveredSites.length - sitesToScan.length, elapsedMs: Math.round(performance.now() - environmentStartedAt) })
+        for (const site of sitesToScan) {
           if (run.cancelled) break
           setProgress({ current: environmentIndex, total: selectedEnvironments.length, message: `Scanning ${site.name} in ${environment.name}` })
           try {
@@ -600,7 +635,7 @@ function App() {
         debugLogger.error('site.discovery.failed', { environmentId: environment.id, environmentName: environment.name, message })
         if (!run.cancelled) {
           scanErrors.push(`${environment.name}: ${message}`)
-          scannedSites.push({ id: `environment-error-${environment.id}`, name: 'Environment access failed', url: '', model: 'Enhanced', environment, error: message })
+          scannedSites.push({ id: `environment-error-${environment.id}`, name: 'Environment access failed', url: '', model: 'Enhanced', environment, active: true, error: message })
         }
       }
     }
@@ -623,14 +658,14 @@ function App() {
 
     const nextFindings = scannedSites.flatMap((site) => (site.analysis?.findings ?? []).map((finding): FindingEntry => ({
       ...finding,
-      key: `${site.environment.id}|${site.id}|${finding.settingName}`,
+      key: wildcardFindingKey(site.environment.id, site.id, site.model, finding.settingName, finding.settingRecordId),
       site,
       proposedValue: finding.proposedFields.join(','),
     })))
     const nextAnonymousFindings = auditAnonymousAccess
       ? scannedSites.flatMap((site) => (site.analysis?.anonymousPermissionFindings ?? []).map((finding): AnonymousFindingEntry => ({
         ...finding,
-        key: `${site.environment.id}|${site.id}|anonymous|${finding.permissionRecordId}`,
+        key: `${site.environment.id}|${site.id}|${site.model}|anonymous|${finding.permissionRecordId}`,
         site,
       })))
       : []
@@ -823,6 +858,7 @@ function App() {
                     <Switch checked={hidePersonalDeveloper} label={`Hide personal developer${hiddenPersonalDeveloperCount ? ` (${hiddenPersonalDeveloperCount})` : ''}`} onChange={(_, data) => togglePersonalDeveloperFilter(data.checked)} />
                     <Switch checked={pasteListEnabled} label="Paste environment list" onChange={(_, data) => togglePasteList(data.checked)} />
                     <Switch checked={auditAnonymousAccess} label="Audit anonymous table access" onChange={(_, data) => setAuditAnonymousAccess(data.checked)} />
+                    <Switch checked={ignoreInactiveSites} label="Ignore inactive sites" onChange={(_, data) => setIgnoreInactiveSites(data.checked)} />
                   </div>
                   <div className="power-pages-filter">
                     <div><strong>Power Pages presence</strong><span>Detect Standard and Enhanced Power Pages sites in the current environment filter.</span></div>
@@ -895,13 +931,13 @@ function App() {
                   <div className="wildcard-site-groups">
                     {wildcardSiteGroups.map((group) => <section className="wildcard-site-group" key={group.key}>
                       <div className="wildcard-site-heading">
-                        <div><strong>{group.site.name}</strong><span>{group.site.environment.name} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
-                        <Checkbox label={`Select all for ${group.site.name}`} checked={approvalSelectionState(group.findings)} disabled={applying} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
+                        <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
+                        <Checkbox label={`Select all for ${group.site.name} (${group.site.model === 'Standard' ? 'SDM' : 'EDM'})`} checked={approvalSelectionState(group.findings)} disabled={applying} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
                       </div>
                       {group.findings.map((finding) => (
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
                           <Checkbox checked={approved.has(finding.key)} disabled={applying} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
-                          <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}</small></span>
+                          <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}{group.findings.filter((candidate) => candidate.settingName.toLowerCase() === finding.settingName.toLowerCase()).length > 1 ? ' · duplicate setting record' : ''}</small></span>
                           <Badge appearance="tint" color="brand">ready to update</Badge>
                         </button>
                       ))}
@@ -919,13 +955,22 @@ function App() {
                 )) : (
                   <div className="empty-state"><CheckmarkCircleRegular /><h3>No updated wildcards yet</h3><p>Wildcard settings move here after the replacement is applied and independently verified.</p></div>
                 ))}
-                {reviewView === 'anonymous' && (anonymousFindings.length > 0 ? anonymousFindings.map((finding) => (
-                  <button className={`finding-row ${selectedAnonymousFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedAnonymousFindingKey(finding.key)}>
-                    <ShieldLockRegular className="finding-icon" />
-                    <span className="finding-copy"><strong>{finding.site.name} / {finding.table}</strong><small>{finding.site.environment.name} · {finding.permissionName}</small></span>
-                    <Badge appearance="tint" color="danger">anonymous access</Badge>
-                  </button>
-                )) : (
+                {reviewView === 'anonymous' && (anonymousFindings.length > 0 ? (
+                  <div className="wildcard-site-groups">
+                    {anonymousSiteGroups.map((group) => <section className="wildcard-site-group" key={group.key}>
+                      <div className="wildcard-site-heading">
+                        <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} anonymous permission{group.findings.length === 1 ? '' : 's'}</span></div>
+                      </div>
+                      {group.findings.map((finding) => (
+                        <button className={`finding-row ${selectedAnonymousFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedAnonymousFindingKey(finding.key)}>
+                          <ShieldLockRegular className="finding-icon" />
+                          <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.permissionName}</small></span>
+                          <Badge appearance="tint" color="danger">anonymous access</Badge>
+                        </button>
+                      ))}
+                    </section>)}
+                  </div>
+                ) : (
                   <div className="empty-state"><CheckmarkCircleRegular /><h3>No anonymous table access found</h3><p>No scanned table permission is assigned to an Anonymous Users role.</p></div>
                 ))}
               </div>
@@ -960,7 +1005,7 @@ function App() {
                   </>
                 ) : reviewView === 'anonymous' && selectedAnonymousFinding ? (
                   <>
-                    <span className="step-label">ANONYMOUS TABLE ACCESS</span><h2>{selectedAnonymousFinding.permissionName}</h2><p>{selectedAnonymousFinding.site.environment.name} / {selectedAnonymousFinding.site.name}</p>
+                    <span className="step-label">ANONYMOUS TABLE ACCESS</span><h2>{selectedAnonymousFinding.permissionName}</h2><p>{selectedAnonymousFinding.site.environment.name} / {selectedAnonymousFinding.site.name} / {selectedAnonymousFinding.site.model === 'Standard' ? 'SDM' : 'EDM'} ({selectedAnonymousFinding.site.model})</p>
                     {recordUrl(selectedAnonymousFinding.site, selectedAnonymousFinding.permissionRecordEntity, selectedAnonymousFinding.permissionRecordId) && <Button as="a" href={recordUrl(selectedAnonymousFinding.site, selectedAnonymousFinding.permissionRecordEntity, selectedAnonymousFinding.permissionRecordId)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open table permission record</Button>}
                     <dl>
                       <dt>Dataverse table</dt><dd><code>{selectedAnonymousFinding.table}</code></dd>

@@ -10,7 +10,7 @@ The app proposes explicit field allowlists, requires review before applying chan
 
 ## Status
 
-This project is under active development and is currently distributed privately for validation. It is not an official Microsoft product or supported Microsoft offering.
+This is an independent, community-supported project created by a Microsoft employee. It is not an official Microsoft product, is not endorsed by Microsoft, and is not covered by Microsoft support or service-level agreements. Use it at your own risk and review every proposed remediation before applying changes.
 
 ## Architecture
 
@@ -70,10 +70,10 @@ solution/PowerPagesWebApiFieldsAuditor/src
 Build managed and unmanaged packages:
 
 ```powershell
-.\scripts\build-solution-packages.ps1 -Version 1.6.0.4
+.\scripts\build-solution-packages.ps1 -Version 1.6.0.12
 ```
 
-The build regenerates all seven schema-neutral flow definitions and rejects static Dataverse table bindings. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.
+The build compiles and embeds the current code app, regenerates all seven schema-neutral flow definitions, and rejects static Dataverse table bindings. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.
 
 ## Release Validation
 
@@ -96,4 +96,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development and review expectations. 
 
 ## License
 
-No license has been granted yet. Keep the repository private until ownership and licensing terms are approved.
+Licensed under the [MIT License](LICENSE). Microsoft, Power Apps, Power Automate, Power Pages, and Dataverse are trademarks of the Microsoft group of companies. Use of those names identifies the services this independent tool works with and does not imply endorsement.

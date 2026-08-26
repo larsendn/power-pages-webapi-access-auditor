@@ -60,7 +60,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('powerpa','gesites')",
-              "$select": "powerpagesiteid,name,primarydomainname"
+              "$select": "powerpagesiteid,name,primarydomainname,statecode,statuscode"
             },
             "authentication": {
               "type": "Raw",
@@ -80,7 +80,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('adx_we','bsites')",
-              "$select": "adx_websiteid,adx_name,adx_primarydomainname"
+              "$select": "adx_websiteid,adx_name,adx_primarydomainname,statecode,statuscode"
             },
             "authentication": {
               "type": "Raw",
@@ -100,7 +100,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('mspp_w','ebsites')",
-              "$select": "mspp_websiteid,mspp_name,mspp_primarydomainname"
+              "$select": "mspp_websiteid,mspp_name,mspp_primarydomainname,statecode,statuscode"
             },
             "authentication": {
               "type": "Raw",
