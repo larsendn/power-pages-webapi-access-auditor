@@ -8,6 +8,12 @@ A Power Apps code app that scans Power Pages sites for:
 
 The app proposes explicit field allowlists, requires review before applying changes, verifies remote state, and records changes for guarded undo.
 
+## Install the app
+
+Download the latest managed solution from [GitHub Releases](https://github.com/larsendn/power-pages-webapi-access-auditor/releases) and follow the beginner-friendly [installation and first-run guide](INSTALLATION.md).
+
+Current managed package: [PowerPagesWebApiFieldsAuditor_1_6_0_14_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.14/PowerPagesWebApiFieldsAuditor_1_6_0_14_managed.zip)
+
 ## Status
 
 This is an independent, community-supported project created by a Microsoft employee. It is not an official Microsoft product, is not endorsed by Microsoft, and is not covered by Microsoft support or service-level agreements. Use it at your own risk and review every proposed remediation before applying changes.
