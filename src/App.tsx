@@ -292,7 +292,7 @@ function App() {
 
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe(setDebugLines)
-    debugLogger.info('app.session.started')
+    debugLogger.info('app.session.started', { version: __APP_VERSION__ })
     return unsubscribe
   }, [])
 
@@ -817,6 +817,7 @@ function App() {
             <button disabled={approved.size === 0}><span>04</span> Apply + verify</button>
             <button className={stage === 'undo' ? 'active' : ''} onClick={() => setStage('undo')}><span>05</span> Undo changes</button>
           </nav>
+          <div className="app-version">Version {__APP_VERSION__}</div>
           <div className="deadline"><WarningRegular /><div><span>Wildcard removal</span><strong>September 14, 2026</strong></div></div>
         </aside>
 

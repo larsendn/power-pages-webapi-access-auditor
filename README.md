@@ -70,7 +70,7 @@ solution/PowerPagesWebApiFieldsAuditor/src
 Build managed and unmanaged packages:
 
 ```powershell
-.\scripts\build-solution-packages.ps1 -Version 1.6.0.12
+.\scripts\build-solution-packages.ps1 -Version 1.6.0.14
 ```
 
 The build compiles and embeds the current code app, regenerates all seven schema-neutral flow definitions, and rejects static Dataverse table bindings. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.

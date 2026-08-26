@@ -24,6 +24,19 @@ describe('site configuration analysis', () => {
     expect(result.findings[0].proposedFields).toEqual(['firstname', 'lastname'])
   })
 
+  it('reads an Enhanced site-setting name from the component row', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'Webapi/contact/fields', content: JSON.stringify({ value: '*', source: 0 }) },
+        { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Contacts', content: JSON.stringify({ customjavascript: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+    })
+
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].settingName).toBe('Webapi/contact/fields')
+    expect(result.findings[0].proposedFields).toEqual(['firstname'])
+  })
+
   it('analyzes Enhanced content snippets', () => {
     const result = analyzeConfiguration('Enhanced', {
       enhancedcomponentsjson: JSON.stringify([
@@ -247,6 +260,23 @@ describe('site configuration analysis', () => {
       privileges: ['Read', 'Write'],
       inherited: true,
     }))
+  })
+
+  it('links an Enhanced finding to its matching table permission record', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'anonymous-role', powerpagecomponenttype: 11, name: 'Anonymous Users', content: JSON.stringify({ anonymoususersrole: true }) },
+        { powerpagecomponentid: 'permission-1', powerpagecomponenttype: 18, name: 'Contact (Global)', content: JSON.stringify({ entityname: 'Contact (Global)', entitylogicalname: 'contact', scope: 756150000, read: true, adx_entitypermission_webrole: ['anonymous-role'] }) },
+      ]),
+      modernpermissionsjson: JSON.stringify([
+        { mspp_entitypermissionid: 'permission-1', mspp_entityname: 'Contact (Global)', mspp_entitylogicalname: 'contact' },
+      ]),
+    })
+
+    expect(result.anonymousPermissionFindings).toEqual([expect.objectContaining({
+      permissionRecordId: 'permission-1',
+      permissionRecordEntity: 'mspp_entitypermission',
+    })])
   })
 
   it('uses Enhanced security components for a Modern site when its N:N rows are empty', () => {

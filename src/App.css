@@ -35,7 +35,8 @@ button:not(:disabled):active, .fui-Button:not(:disabled):active { transform: tra
 .rail nav button span { font: 700 11px/1 monospace; color: #b69ddd; }
 .rail nav button.active { color: white; background: rgba(255,255,255,.09); border-left-color: var(--accent); }
 .rail nav button:disabled { opacity: .48; cursor: not-allowed; }
-.deadline { margin-top: auto; padding-top: 18px; display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,.2); }
+.app-version { margin-top: auto; padding: 18px 0 10px; color: #d9cef0; font: 700 11px/1 monospace; }
+.deadline { padding-top: 18px; display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,.2); }
 .deadline svg { font-size: 20px; color: var(--accent); }
 .deadline span, .deadline strong { display: block; }
 .deadline span { font-size: 11px; color: #d9cef0; }

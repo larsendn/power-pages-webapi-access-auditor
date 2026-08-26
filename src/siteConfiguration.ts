@@ -214,7 +214,7 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
   const modernPermissionIds = new Set(parseRows(payload.modernpermissionsjson)
     .map((row) => text(row.mspp_entitypermissionid).toLowerCase())
     .filter(Boolean))
-  const navigableComponentPermissionFindings = model === 'Modern'
+  const navigableComponentPermissionFindings = model === 'Modern' || model === 'Enhanced'
     ? componentPermissionFindings.map((finding): AnonymousPermissionFinding => modernPermissionIds.has(finding.permissionRecordId.toLowerCase())
       ? { ...finding, permissionRecordEntity: 'mspp_entitypermission' }
       : finding)
@@ -236,9 +236,10 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
       const content = parseContent(row.content)
       const componentType = Number(row.powerpagecomponenttype)
       const name = text(row.name) || `component-${text(row.powerpagecomponentid)}`
-      if (componentType === 9 && text(content.name)) {
+      const settingName = text(content.name) || text(row.name)
+      if (componentType === 9 && settingName) {
         settings.push({
-          name: text(content.name),
+          name: settingName,
           value: text(content.value),
           recordId: text(row.powerpagecomponentid),
           recordEntity: 'powerpagecomponent',
