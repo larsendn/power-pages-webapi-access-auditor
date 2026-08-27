@@ -12,7 +12,7 @@ The app proposes explicit field allowlists, requires review before applying chan
 
 Download the latest managed solution from [GitHub Releases](https://github.com/larsendn/power-pages-webapi-access-auditor/releases) and follow the beginner-friendly [installation and first-run guide](INSTALLATION.md).
 
-Current managed package: [PowerPagesWebApiFieldsAuditor_1_6_0_14_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.14/PowerPagesWebApiFieldsAuditor_1_6_0_14_managed.zip)
+Current managed package: [PowerPagesWebApiFieldsAuditor_1_6_0_15_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.15/PowerPagesWebApiFieldsAuditor_1_6_0_15_managed.zip)
 
 ## Status
 
@@ -73,13 +73,14 @@ The authoritative unpacked solution source is:
 solution/PowerPagesWebApiFieldsAuditor/src
 ```
 
-Build managed and unmanaged packages:
+Publish the code app into its Dataverse solution, then export official managed and unmanaged packages:
 
 ```powershell
-.\scripts\build-solution-packages.ps1 -Version 1.6.0.14
+$env:PPWFA_PRIVACY_FORBIDDEN_VALUES = "<environment-id>;<organization-url>;<organization-name>;<user-email>"
+.\scripts\build-solution-packages.ps1 -Version 1.6.0.15 -SolutionId <solution-id>
 ```
 
-The build compiles and embeds the current code app, regenerates all seven schema-neutral flow definitions, and rejects static Dataverse table bindings. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.
+The build runs tests, lint, and the production build; publishes with the supported `pa app push --solution-id` workflow; exports through Dataverse; and rejects archives containing configured source-environment values, organization URLs, email addresses, token signatures, or assigned secrets. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.
 
 ## Release Validation
 
