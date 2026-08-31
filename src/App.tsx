@@ -5,7 +5,7 @@ import {
 } from '@fluentui/react-components'
 import {
   ArrowDownloadRegular, ArrowLeftRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUploadRegular,
-  CheckmarkCircleRegular, DatabaseSearchRegular, OpenRegular, SearchRegular, ShieldLockRegular, StopRegular, WarningRegular,
+  CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DatabaseSearchRegular, OpenRegular, SearchRegular, ShieldLockRegular, StopRegular, WarningRegular,
 } from '@fluentui/react-icons'
 import { parseAccessibleEnvironments, type EnvironmentTarget, type TableFinding } from './auditor'
 import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type ChangeHistoryRecord } from './changeHistory'
@@ -212,6 +212,7 @@ function App() {
   const [updatedFindings, setUpdatedFindings] = useState<FindingEntry[]>(restoredWorkspace?.updatedFindings ?? [])
   const [anonymousFindings, setAnonymousFindings] = useState<AnonymousFindingEntry[]>(restoredWorkspace?.anonymousFindings ?? [])
   const [reviewView, setReviewView] = useState<ReviewView>(restoredWorkspace?.reviewView ?? 'wildcards')
+  const [collapsedSiteGroups, setCollapsedSiteGroups] = useState<Set<string>>(new Set())
   const [approved, setApproved] = useState<Set<string>>(new Set(restoredWorkspace?.approvedKeys ?? []))
   const [manualValues, setManualValues] = useState<Record<string, string>>(restoredWorkspace?.manualValues ?? {})
   const [selectedFindingKey, setSelectedFindingKey] = useState(restoredWorkspace?.selectedFindingKey ?? '')
@@ -289,6 +290,15 @@ function App() {
   const readyCount = findings.filter((finding) => approvalValue(finding)).length
   const selectedFieldsRequiredCount = findings.filter((finding) => approved.has(finding.key) && !approvalValue(finding)).length
   const failedSiteCount = sites.filter((site) => site.error).length
+
+  function toggleSiteGroup(groupKey: string) {
+    setCollapsedSiteGroups((current) => {
+      const next = new Set(current)
+      if (next.has(groupKey)) next.delete(groupKey)
+      else next.add(groupKey)
+      return next
+    })
+  }
 
   useEffect(() => {
     const unsubscribe = debugLogger.subscribe(setDebugLines)
@@ -910,7 +920,7 @@ function App() {
           )}
 
           {stage === 'review' && (
-            <section className={`review-layout ${reviewView === 'wildcards' ? 'has-apply-bar' : ''}`}>
+            <section className="review-layout">
               <div className="review-list-pane">
                 <div className="review-summary">
                   <Button appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => setStage('environments')}>Environments</Button>
@@ -924,25 +934,32 @@ function App() {
                   <Button role="tab" aria-selected={reviewView === 'updated'} appearance={reviewView === 'updated' ? 'primary' : 'subtle'} onClick={() => setReviewView('updated')}>Updated wildcards ({updatedFindings.length})</Button>
                   <Button role="tab" aria-selected={reviewView === 'anonymous'} appearance={reviewView === 'anonymous' ? 'primary' : 'subtle'} onClick={() => setReviewView('anonymous')}>Anonymous table access ({anonymousFindings.length})</Button>
                 </div>
+                {reviewView === 'wildcards' && <div className="apply-bar"><span>{approved.size} wildcard change{approved.size === 1 ? '' : 's'} selected{selectedFieldsRequiredCount > 0 ? `; ${selectedFieldsRequiredCount} need fields` : ''}</span><Button icon={applying ? <Spinner size="tiny" /> : undefined} appearance="primary" disabled={approved.size === 0 || selectedFieldsRequiredCount > 0 || applying} aria-busy={applying} onClick={applyApproved}>{applying ? `Applying and verifying ${progress.current + 1} of ${progress.total}` : 'Apply selected and verify'}</Button></div>}
                 {reviewView === 'wildcards' && (findings.length > 0 ? <>
                   <div className="wildcard-selection-toolbar">
                     <div><strong>Select wildcard changes</strong><span>Select every result, then clear individual sites or settings that should not be updated.</span></div>
                     <Checkbox label={`Select all results (${findings.length})`} checked={approvalSelectionState(findings)} disabled={applying} onChange={(_, data) => toggleApprovals(findings, data.checked === true)} />
                   </div>
                   <div className="wildcard-site-groups">
-                    {wildcardSiteGroups.map((group) => <section className="wildcard-site-group" key={group.key}>
+                    {wildcardSiteGroups.map((group) => {
+                      const collapsed = collapsedSiteGroups.has(group.key)
+                      const contentId = `wildcard-site-${group.key.replace(/[^a-z0-9_-]/gi, '-')}`
+                      return <section className="wildcard-site-group" key={group.key}>
                       <div className="wildcard-site-heading">
-                        <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
+                        <div className="wildcard-site-heading-main">
+                          <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
+                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
+                        </div>
                         <Checkbox label={`Select all for ${group.site.name} (${group.site.model === 'Standard' ? 'SDM' : 'EDM'})`} checked={approvalSelectionState(group.findings)} disabled={applying} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
                       </div>
-                      {group.findings.map((finding) => (
+                      <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
                           <Checkbox checked={approved.has(finding.key)} disabled={applying} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
                           <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}{group.findings.filter((candidate) => candidate.settingName.toLowerCase() === finding.settingName.toLowerCase()).length > 1 ? ' · duplicate setting record' : ''}</small></span>
                           <Badge appearance="tint" color="brand">ready to update</Badge>
                         </button>
-                      ))}
-                    </section>)}
+                      ))}</div>
+                    </section>})}
                   </div>
                 </> : (
                   <div className="empty-state"><CheckmarkCircleRegular /><h3>No wildcard settings found</h3><p>The selected accessible sites did not return a <code>Webapi/&lt;table&gt;/fields</code> setting containing <code>*</code>.</p></div>
@@ -958,18 +975,24 @@ function App() {
                 ))}
                 {reviewView === 'anonymous' && (anonymousFindings.length > 0 ? (
                   <div className="wildcard-site-groups">
-                    {anonymousSiteGroups.map((group) => <section className="wildcard-site-group" key={group.key}>
+                    {anonymousSiteGroups.map((group) => {
+                      const collapsed = collapsedSiteGroups.has(group.key)
+                      const contentId = `anonymous-site-${group.key.replace(/[^a-z0-9_-]/gi, '-')}`
+                      return <section className="wildcard-site-group" key={group.key}>
                       <div className="wildcard-site-heading">
-                        <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} anonymous permission{group.findings.length === 1 ? '' : 's'}</span></div>
+                        <div className="wildcard-site-heading-main">
+                          <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
+                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} anonymous permission{group.findings.length === 1 ? '' : 's'}</span></div>
+                        </div>
                       </div>
-                      {group.findings.map((finding) => (
+                      <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                         <button className={`finding-row ${selectedAnonymousFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedAnonymousFindingKey(finding.key)}>
                           <ShieldLockRegular className="finding-icon" />
                           <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.permissionName}</small></span>
                           <Badge appearance="tint" color="danger">anonymous access</Badge>
                         </button>
-                      ))}
-                    </section>)}
+                      ))}</div>
+                    </section>})}
                   </div>
                 ) : (
                   <div className="empty-state"><CheckmarkCircleRegular /><h3>No anonymous table access found</h3><p>No scanned table permission is assigned to an Anonymous Users role.</p></div>
@@ -1018,7 +1041,6 @@ function App() {
                   </>
                 ) : <div className="empty-detail"><DatabaseSearchRegular /><p>Select a finding to inspect its evidence.</p></div>}
               </aside>
-              {reviewView === 'wildcards' && <div className="apply-bar"><span>{approved.size} wildcard change{approved.size === 1 ? '' : 's'} selected{selectedFieldsRequiredCount > 0 ? `; ${selectedFieldsRequiredCount} need fields` : ''}</span><Button icon={applying ? <Spinner size="tiny" /> : undefined} appearance="primary" disabled={approved.size === 0 || selectedFieldsRequiredCount > 0 || applying} aria-busy={applying} onClick={applyApproved}>{applying ? `Applying and verifying ${progress.current + 1} of ${progress.total}` : 'Apply selected and verify'}</Button></div>}
             </section>
           )}
           {stage === 'undo' && (

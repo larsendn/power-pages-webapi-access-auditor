@@ -72,8 +72,29 @@ function stringValue(...values: unknown[]): string {
   return values.find((value) => typeof value === 'string' && value.trim())?.toString().trim() ?? ''
 }
 
+function isExcludedEnvironment(row: Record<string, unknown>): boolean {
+  const properties = object(row.properties)
+  const linkedMetadata = object(properties.linkedEnvironmentMetadata)
+  const environmentKind = `${stringValue(properties.environmentSku, row.environmentSku)} ${stringValue(properties.environmentType, row.environmentType)}`
+  if (/\b(teams|trial)\b/i.test(environmentKind)) return true
+
+  const url = stringValue(
+    linkedMetadata.instanceUrl,
+    linkedMetadata.environmentUrl,
+    linkedMetadata.url,
+    properties.environmentUrl,
+    properties.instanceUrl,
+    properties.url,
+    row.environmentUrl,
+    row.instanceUrl,
+    row.url,
+  )
+  const name = stringValue(properties.displayName, row.displayName, row.name)
+  return !url && /\b(teams|trial)\b/i.test(name)
+}
+
 export function parseAccessibleEnvironments(rows: Record<string, unknown>[]): EnvironmentTarget[] {
-  return rows.map((row): EnvironmentTarget => {
+  return rows.filter((row) => !isExcludedEnvironment(row)).map((row): EnvironmentTarget => {
     const properties = object(row.properties)
     const linkedMetadata = object(properties.linkedEnvironmentMetadata)
     const url = stringValue(

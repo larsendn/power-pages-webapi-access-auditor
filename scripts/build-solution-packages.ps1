@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.6.0.15",
+    [string]$Version = "1.6.0.16",
     [Parameter(Mandatory = $true)]
     [Guid]$SolutionId,
     [string]$SolutionUniqueName = "PowerPagesWebApiFieldsAuditor"
@@ -11,6 +11,18 @@ $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $solutionDirectory = Join-Path $projectRoot "solution"
 $versionToken = $Version.Replace(".", "_")
 $forbiddenValues = @($env:PPWFA_PRIVACY_FORBIDDEN_VALUES -split ";" | Where-Object { $_.Trim() })
+$powerConfigPath = Join-Path $projectRoot "power.config.json"
+
+if (-not (Test-Path $powerConfigPath)) {
+    throw "power.config.json is required to identify the Code App environment."
+}
+
+$environmentId = (Get-Content $powerConfigPath -Raw | ConvertFrom-Json).environmentId
+$parsedEnvironmentId = [Guid]::Empty
+if (-not [Guid]::TryParse($environmentId, [ref]$parsedEnvironmentId)) {
+    throw "power.config.json must contain a valid environmentId."
+}
+$environmentId = $parsedEnvironmentId.ToString()
 
 if ($forbiddenValues.Count -eq 0) {
     throw "Set PPWFA_PRIVACY_FORBIDDEN_VALUES to source-environment identifiers before exporting."
@@ -154,7 +166,7 @@ try {
     npm run build
     Assert-LastCommandSucceeded "The code app production build failed."
 
-    pac solution online-version --solution-name $SolutionUniqueName --solution-version $Version
+    pac solution online-version --environment $environmentId --solution-name $SolutionUniqueName --solution-version $Version
     Assert-LastCommandSucceeded "Updating the online solution version failed."
 
     npx pa app push --solution-id $SolutionId
@@ -172,13 +184,16 @@ try {
         foreach ($export in $exports) {
             $fileName = "PowerPagesWebApiFieldsAuditor_${versionToken}_$($export.Type).zip"
             $temporaryPath = Join-Path $temporaryDirectory $fileName
-            $arguments = @("solution", "export", "--name", $SolutionUniqueName, "--path", $temporaryPath, "--overwrite")
+            $arguments = @("solution", "export", "--environment", $environmentId, "--name", $SolutionUniqueName, "--path", $temporaryPath, "--overwrite")
             if ($export.Managed) {
                 $arguments += "--managed"
             }
 
             & pac @arguments
             Assert-LastCommandSucceeded "Official $($export.Type) solution export failed."
+            if (-not (Test-Path $temporaryPath)) {
+                throw "Official $($export.Type) solution export did not create an archive."
+            }
             Assert-PrivacySafeArchive $temporaryPath
             Assert-ReleaseArchive $temporaryPath $Version $export.Managed
         }

@@ -85,19 +85,36 @@ describe('environment discovery', () => {
     ])
   })
 
-  it('uses the connector environment ID when no Dataverse URL is exposed', () => {
+  it('filters Teams and trial environments while retaining ordinary Dataverse environments with those words in the name', () => {
     expect(parseAccessibleEnvironments([
       { name: 'environment-without-dataverse', properties: { displayName: 'Teams only' } },
-    ])).toEqual([{
-      id: 'environment-without-dataverse',
-      name: 'Teams only',
-      target: 'environment-without-dataverse',
-      url: '',
-      sku: '',
-      type: '',
-      isProduction: false,
-      isPersonalDeveloper: false,
-    }])
+      { name: 'explicit-teams', properties: { displayName: 'Collaboration', environmentSku: 'Teams' } },
+      { name: 'trial-without-dataverse', properties: { displayName: 'Trial only' } },
+      { name: 'explicit-trial', properties: { displayName: 'Evaluation', environmentType: 'Trial' } },
+      { name: 'dataverse-teams-project', properties: { displayName: 'Teams Project', environmentType: 'Sandbox', environmentUrl: 'https://teams-project.crm.dynamics.com' } },
+      { name: 'dataverse-trial-project', properties: { displayName: 'Trial Migration', environmentType: 'Sandbox', environmentUrl: 'https://trial-project.crm.dynamics.com' } },
+    ])).toEqual([
+      {
+        id: 'dataverse-teams-project',
+        name: 'Teams Project',
+        target: 'https://teams-project.crm.dynamics.com',
+        url: 'https://teams-project.crm.dynamics.com',
+        sku: '',
+        type: 'Sandbox',
+        isProduction: false,
+        isPersonalDeveloper: false,
+      },
+      {
+        id: 'dataverse-trial-project',
+        name: 'Trial Migration',
+        target: 'https://trial-project.crm.dynamics.com',
+        url: 'https://trial-project.crm.dynamics.com',
+        sku: '',
+        type: 'Sandbox',
+        isProduction: false,
+        isPersonalDeveloper: false,
+      },
+    ])
   })
 })
 
