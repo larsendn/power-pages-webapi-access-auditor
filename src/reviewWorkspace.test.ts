@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { wildcardFindingKey, withoutNestedSiteAnalysis } from './reviewWorkspace'
+import { wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
 
 describe('withoutNestedSiteAnalysis', () => {
   it('removes repeated analysis while preserving review data and source links', () => {
@@ -33,6 +33,22 @@ describe('withoutNestedSiteAnalysis', () => {
     const serialized = JSON.stringify(withoutNestedSiteAnalysis(entries))
 
     expect(new Blob([serialized]).size).toBeLessThan(1_000_000)
+  })
+})
+
+describe('withoutComponentEvidenceLinks', () => {
+  it('removes obsolete site-component navigation from restored code evidence', () => {
+    const entries = [{
+      evidence: [
+        { field: '*', recordEntity: 'powerpagecomponent', recordId: 'component-id' },
+        { field: 'name', recordEntity: 'adx_webpage', recordId: 'page-id' },
+      ],
+    }]
+
+    expect(withoutComponentEvidenceLinks(entries)[0].evidence).toEqual([
+      { field: '*', recordEntity: undefined, recordId: undefined },
+      { field: 'name', recordEntity: 'adx_webpage', recordId: 'page-id' },
+    ])
   })
 })
 

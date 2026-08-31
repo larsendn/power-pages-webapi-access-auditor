@@ -15,7 +15,7 @@ import { minimumExplicitFields, normalizeExplicitFields } from './approval'
 import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isActiveSiteRecord, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
-import { wildcardFindingKey, withoutNestedSiteAnalysis } from './reviewWorkspace'
+import { wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
 import { analyzeConfiguration, isCodeWebFile, parseRows, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
 import powerPagesLogo from './assets/power-pages-logo.png'
 import './App.css'
@@ -39,7 +39,7 @@ const DETECTION_PROFILES: { value: DetectionConcurrency; label: string }[] = [
   { value: 9, label: 'Fast' },
 ]
 const CHANGE_HISTORY_KEY = 'ppwfaChangeHistoryV1'
-const REVIEW_WORKSPACE_KEY = 'ppwfaReviewWorkspaceV1'
+const REVIEW_WORKSPACE_KEY = 'ppwfaReviewWorkspaceV2'
 
 function loadChangeHistory(): ChangeHistoryRecord[] {
   try {
@@ -56,7 +56,10 @@ function loadReviewWorkspace(): SavedReviewWorkspace | null {
     if (!stored) return null
     const parsed = JSON.parse(stored) as Partial<SavedReviewWorkspace>
     if (parsed.version !== 1 || !Array.isArray(parsed.findings) || !Array.isArray(parsed.updatedFindings) || !Array.isArray(parsed.anonymousFindings)) return null
-    return parsed as SavedReviewWorkspace
+    const workspace = parsed as SavedReviewWorkspace
+    workspace.findings = withoutComponentEvidenceLinks(workspace.findings)
+    workspace.updatedFindings = withoutComponentEvidenceLinks(workspace.updatedFindings)
+    return workspace
   } catch {
     return null
   }
@@ -148,6 +151,11 @@ function recordUrl(site: PowerPagesSite, entity: string, recordId: string): stri
   const environmentUrl = site.environment.url.replace(/\/$/, '')
   if (!environmentUrl) return ''
   return `${environmentUrl}/main.aspx?pagetype=entityrecord&etn=${encodeURIComponent(entity)}&id=${encodeURIComponent(recordId)}`
+}
+
+function codeRecordUrl(site: PowerPagesSite, entity?: string, recordId?: string): string {
+  if (!entity || !recordId || entity === 'powerpagecomponent') return ''
+  return recordUrl(site, entity, recordId)
 }
 
 function siteSettingRecordUrl(site: PowerPagesSite, finding: TableFinding): string {
@@ -1035,7 +1043,7 @@ function App() {
                     {selectedFinding.blockers.length > 0 && (requiresFetchXmlChange(selectedFinding) ? <><div className="blocker-panel"><strong>Code change required</strong><p>This FetchXML query uses <code>&lt;all-attributes /&gt;</code>, which Power Pages sends as attribute <code>*</code>. Replace it with explicit <code>&lt;attribute name="..." /&gt;</code> elements, then rescan before removing the wildcard.</p></div><div className="code-suggestion"><div><strong>Suggested FetchXML replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedFetchXmlAttributes(selectedFinding))}>Copy suggestion</Button></div><pre><code>{suggestedFetchXmlAttributes(selectedFinding)}</code></pre><p>This is a starting point based on columns detected in this entity's attributes, filters, and ordering. Add every column read by page rendering or business logic before rescanning. The auditor does not update customer code.</p></div></> : <div className="blocker-panel"><strong>Minimum allowlist selected</strong><p>No static Web API fields were found, so this update retains access only to <code>{minimumExplicitFields(selectedFinding.table)}</code>. Add fields above if this table is accessed dynamically.</p></div>)}
                     <h3>References ({selectedFinding.evidence.length})</h3>
                     <div className="evidence-list">{selectedFinding.evidence.map((evidence, index) => {
-                      const sourceUrl = evidence.recordEntity && evidence.recordId ? recordUrl(selectedFinding.site, evidence.recordEntity, evidence.recordId) : ''
+                      const sourceUrl = codeRecordUrl(selectedFinding.site, evidence.recordEntity, evidence.recordId)
                       return <div className="evidence-row" key={`${evidence.file}-${evidence.line}-${evidence.field}-${index}`}><div className="evidence-row-head"><code>{evidence.field}</code>{sourceUrl && <Button as="a" href={sourceUrl} target="_blank" rel="noreferrer" appearance="subtle" size="small" icon={<OpenRegular />} className="evidence-record-link">Open record</Button>}</div><span>{evidence.source} · {evidence.file}:{evidence.line}</span></div>
                     })}</div>
                     {selectedFinding.applyStatus && <MessageBar intent={selectedFinding.applyStatus === 'verified' ? 'success' : selectedFinding.applyStatus === 'failed' ? 'error' : 'info'}><MessageBarBody>{selectedFinding.applyMessage}</MessageBarBody></MessageBar>}
@@ -1048,7 +1056,7 @@ function App() {
                     {selectedUpdatedFinding.blockers.length > 0 && <div className="blocker-panel"><strong>Minimum allowlist was used</strong><p>The scan found no static Web API fields, so the verified update retained access only to <code>{minimumExplicitFields(selectedUpdatedFinding.table)}</code>.</p></div>}
                     <h3>References ({selectedUpdatedFinding.evidence.length})</h3>
                     <div className="evidence-list">{selectedUpdatedFinding.evidence.map((evidence, index) => {
-                      const sourceUrl = evidence.recordEntity && evidence.recordId ? recordUrl(selectedUpdatedFinding.site, evidence.recordEntity, evidence.recordId) : ''
+                      const sourceUrl = codeRecordUrl(selectedUpdatedFinding.site, evidence.recordEntity, evidence.recordId)
                       return <div className="evidence-row" key={`${evidence.file}-${evidence.line}-${evidence.field}-${index}`}><div className="evidence-row-head"><code>{evidence.field}</code>{sourceUrl && <Button as="a" href={sourceUrl} target="_blank" rel="noreferrer" appearance="subtle" size="small" icon={<OpenRegular />} className="evidence-record-link">Open record</Button>}</div><span>{evidence.source} · {evidence.file}:{evidence.line}</span></div>
                     })}</div>
                     <MessageBar intent="success"><MessageBarBody>{selectedUpdatedFinding.applyMessage}</MessageBarBody></MessageBar>
