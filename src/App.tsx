@@ -5,9 +5,9 @@ import {
 } from '@fluentui/react-components'
 import {
   ArrowDownloadRegular, ArrowLeftRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUploadRegular,
-  CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, DatabaseSearchRegular, OpenRegular, SearchRegular, ShieldLockRegular, StopRegular, WarningRegular,
+  CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DatabaseSearchRegular, OpenRegular, SearchRegular, ShieldLockRegular, StopRegular, WarningRegular,
 } from '@fluentui/react-icons'
-import { parseAccessibleEnvironments, type EnvironmentTarget, type TableFinding } from './auditor'
+import { parseAccessibleEnvironments, suggestedFetchXmlAttributes, type EnvironmentTarget, type TableFinding } from './auditor'
 import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type ChangeHistoryRecord } from './changeHistory'
 import { flowErrorMessage } from './errorMessage'
 import { flowGateway } from './flowGateway'
@@ -150,6 +150,17 @@ function recordUrl(site: PowerPagesSite, entity: string, recordId: string): stri
   return `${environmentUrl}/main.aspx?pagetype=entityrecord&etn=${encodeURIComponent(entity)}&id=${encodeURIComponent(recordId)}`
 }
 
+function siteSettingRecordUrl(site: PowerPagesSite, finding: TableFinding): string {
+  if (finding.settingNavigationRecordEntity && finding.settingNavigationRecordId) {
+    return recordUrl(site, finding.settingNavigationRecordEntity, finding.settingNavigationRecordId)
+  }
+  return finding.settingRecordEntity === 'powerpagecomponent' ? '' : recordUrl(site, finding.settingRecordEntity, finding.settingRecordId)
+}
+
+function requiresFetchXmlChange(finding: TableFinding): boolean {
+  return finding.blockers.some((blocker) => blocker.startsWith('FetchXML uses <all-attributes />'))
+}
+
 function decodeBase64(value: string): string {
   const bytes = Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
   return new TextDecoder().decode(bytes)
@@ -195,6 +206,7 @@ function App() {
   const [includeNonProduction, setIncludeNonProduction] = useState(true)
   const [includeProduction, setIncludeProduction] = useState(false)
   const [hidePersonalDeveloper, setHidePersonalDeveloper] = useState(true)
+  const [hideTrial, setHideTrial] = useState(true)
   const [environmentFilter, setEnvironmentFilter] = useState('')
   const [pasteListEnabled, setPasteListEnabled] = useState(false)
   const [bulkEnvironmentList, setBulkEnvironmentList] = useState('')
@@ -244,9 +256,9 @@ function App() {
     return environments.filter((environment) => {
       const includedType = environment.isProduction ? includeProduction : includeNonProduction
       const searchable = `${environment.name} ${environment.url} ${environment.sku} ${environment.type}`.toLowerCase()
-      return includedType && (!hidePersonalDeveloper || !environment.isPersonalDeveloper) && (!query || searchable.includes(query))
+      return includedType && (!hidePersonalDeveloper || !environment.isPersonalDeveloper) && (!hideTrial || !environment.isTrial) && (!query || searchable.includes(query))
     })
-  }, [environmentFilter, environments, hidePersonalDeveloper, includeNonProduction, includeProduction])
+  }, [environmentFilter, environments, hidePersonalDeveloper, hideTrial, includeNonProduction, includeProduction])
   const bulkMatches = useMemo(
     () => scopedEnvironments.filter((environment) => matchesEnvironmentList(environment, bulkEntries)),
     [bulkEntries, scopedEnvironments],
@@ -257,6 +269,7 @@ function App() {
     [environmentCandidates, powerPagesPresence, showOnlyPowerPages],
   )
   const hiddenPersonalDeveloperCount = environments.filter((environment) => environment.isPersonalDeveloper).length
+  const hiddenTrialCount = environments.filter((environment) => environment.isTrial).length
   const detectedPowerPagesCount = environmentCandidates.filter((environment) => powerPagesPresence[environment.id] === 'present').length
   const detectedEnvironmentCount = environmentCandidates.filter((environment) => powerPagesPresence[environment.id]).length
   const environmentsNeedingDetection = environmentCandidates.filter((environment) => !powerPagesPresence[environment.id] || powerPagesPresence[environment.id] === 'failed')
@@ -286,7 +299,7 @@ function App() {
     }
     return [...groups.values()]
   }, [anonymousFindings])
-  const approvalValue = (finding: FindingEntry) => normalizeExplicitFields(manualValues[finding.key] ?? '') || normalizeExplicitFields(finding.proposedValue) || minimumExplicitFields(finding.table)
+  const approvalValue = (finding: FindingEntry) => requiresFetchXmlChange(finding) ? '' : normalizeExplicitFields(manualValues[finding.key] ?? '') || normalizeExplicitFields(finding.proposedValue) || minimumExplicitFields(finding.table)
   const readyCount = findings.filter((finding) => approvalValue(finding)).length
   const selectedFieldsRequiredCount = findings.filter((finding) => approved.has(finding.key) && !approvalValue(finding)).length
   const failedSiteCount = sites.filter((site) => site.error).length
@@ -417,6 +430,7 @@ function App() {
         setIncludeNonProduction(true)
         setIncludeProduction(false)
         setHidePersonalDeveloper(true)
+        setHideTrial(true)
         setEnvironmentFilter('')
         setPasteListEnabled(false)
         setBulkEnvironmentList('')
@@ -463,6 +477,16 @@ function App() {
     setSelectedEnvironmentIds((current) => {
       const next = new Set(current)
       environments.filter((environment) => environment.isPersonalDeveloper).forEach((environment) => next.delete(environment.id))
+      return next
+    })
+  }
+
+  function toggleTrialFilter(checked: boolean) {
+    setHideTrial(checked)
+    if (!checked) return
+    setSelectedEnvironmentIds((current) => {
+      const next = new Set(current)
+      environments.filter((environment) => environment.isTrial).forEach((environment) => next.delete(environment.id))
       return next
     })
   }
@@ -714,7 +738,7 @@ function App() {
     setApproved((current) => {
       const next = new Set(current)
       for (const entry of entries) {
-        if (checked) next.add(entry.key)
+        if (checked && !requiresFetchXmlChange(entry)) next.add(entry.key)
         else next.delete(entry.key)
       }
       return next
@@ -722,8 +746,9 @@ function App() {
   }
 
   function approvalSelectionState(entries: FindingEntry[]): boolean | 'mixed' {
-    const selected = entries.filter((entry) => approved.has(entry.key)).length
-    return selected === 0 ? false : selected === entries.length ? true : 'mixed'
+    const eligible = entries.filter((entry) => !requiresFetchXmlChange(entry))
+    const selected = eligible.filter((entry) => approved.has(entry.key)).length
+    return selected === 0 ? false : selected === eligible.length ? true : 'mixed'
   }
 
   function updateManualValue(finding: FindingEntry, value: string) {
@@ -867,6 +892,7 @@ function App() {
                     <Switch checked={includeNonProduction} label="Sandbox and non-production" onChange={(_, data) => toggleEnvironmentType(false, data.checked)} />
                     <Switch checked={includeProduction} label="Production" onChange={(_, data) => toggleEnvironmentType(true, data.checked)} />
                     <Switch checked={hidePersonalDeveloper} label={`Hide personal developer${hiddenPersonalDeveloperCount ? ` (${hiddenPersonalDeveloperCount})` : ''}`} onChange={(_, data) => togglePersonalDeveloperFilter(data.checked)} />
+                    <Switch checked={hideTrial} label={`Hide trial${hiddenTrialCount ? ` (${hiddenTrialCount})` : ''}`} onChange={(_, data) => toggleTrialFilter(data.checked)} />
                     <Switch checked={pasteListEnabled} label="Paste environment list" onChange={(_, data) => togglePasteList(data.checked)} />
                     <Switch checked={auditAnonymousAccess} label="Audit anonymous table access" onChange={(_, data) => setAuditAnonymousAccess(data.checked)} />
                     <Switch checked={ignoreInactiveSites} label="Ignore inactive sites" onChange={(_, data) => setIgnoreInactiveSites(data.checked)} />
@@ -938,7 +964,7 @@ function App() {
                 {reviewView === 'wildcards' && (findings.length > 0 ? <>
                   <div className="wildcard-selection-toolbar">
                     <div><strong>Select wildcard changes</strong><span>Select every result, then clear individual sites or settings that should not be updated.</span></div>
-                    <Checkbox label={`Select all results (${findings.length})`} checked={approvalSelectionState(findings)} disabled={applying} onChange={(_, data) => toggleApprovals(findings, data.checked === true)} />
+                    <Checkbox label={`Select all results (${findings.filter((finding) => !requiresFetchXmlChange(finding)).length})`} checked={approvalSelectionState(findings)} disabled={applying || findings.every(requiresFetchXmlChange)} onChange={(_, data) => toggleApprovals(findings, data.checked === true)} />
                   </div>
                   <div className="wildcard-site-groups">
                     {wildcardSiteGroups.map((group) => {
@@ -950,13 +976,13 @@ function App() {
                           <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
                           <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
                         </div>
-                        <Checkbox label={`Select all for ${group.site.name} (${group.site.model === 'Standard' ? 'SDM' : 'EDM'})`} checked={approvalSelectionState(group.findings)} disabled={applying} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
+                        <Checkbox label={`Select all for ${group.site.name} (${group.site.model === 'Standard' ? 'SDM' : 'EDM'})`} checked={approvalSelectionState(group.findings)} disabled={applying || group.findings.every(requiresFetchXmlChange)} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
                       </div>
                       <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
-                          <Checkbox checked={approved.has(finding.key)} disabled={applying} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
+                          <Checkbox checked={approved.has(finding.key)} disabled={applying || requiresFetchXmlChange(finding)} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
                           <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}{group.findings.filter((candidate) => candidate.settingName.toLowerCase() === finding.settingName.toLowerCase()).length > 1 ? ' · duplicate setting record' : ''}</small></span>
-                          <Badge appearance="tint" color="brand">ready to update</Badge>
+                          <Badge appearance="tint" color={requiresFetchXmlChange(finding) ? 'danger' : 'brand'}>{requiresFetchXmlChange(finding) ? 'code change required' : 'ready to update'}</Badge>
                         </button>
                       ))}</div>
                     </section>})}
@@ -1003,10 +1029,10 @@ function App() {
                 {reviewView === 'wildcards' && selectedFinding ? (
                   <>
                     <span className="step-label">CODE EVIDENCE</span><h2>{selectedFinding.settingName}</h2><p>{selectedFinding.site.environment.name} / {selectedFinding.site.name}</p>
-                    {recordUrl(selectedFinding.site, selectedFinding.settingRecordEntity, selectedFinding.settingRecordId) && <Button as="a" href={recordUrl(selectedFinding.site, selectedFinding.settingRecordEntity, selectedFinding.settingRecordId)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
-                    <dl><dt>Current value</dt><dd><code>{selectedFinding.currentValue}</code></dd><dt>Explicit replacement</dt><dd><code>{approvalValue(selectedFinding) || 'Enter the fields below'}</code></dd></dl>
-                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields (optional override)</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={approvalValue(selectedFinding)} disabled={applying} /><small>The primary ID is used as the minimum allowlist when no code fields are found. Enter additional logical column names here when needed.</small></div>
-                    {selectedFinding.blockers.length > 0 && <div className="blocker-panel"><strong>Minimum allowlist selected</strong><p>No static Web API fields were found, so this update retains access only to <code>{minimumExplicitFields(selectedFinding.table)}</code>. Add fields above if this table is accessed dynamically.</p></div>}
+                    {siteSettingRecordUrl(selectedFinding.site, selectedFinding) && <Button as="a" href={siteSettingRecordUrl(selectedFinding.site, selectedFinding)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
+                    <dl><dt>Current value</dt><dd><code>{selectedFinding.currentValue}</code></dd><dt>Explicit replacement</dt><dd><code>{requiresFetchXmlChange(selectedFinding) ? 'Change FetchXML and rescan' : approvalValue(selectedFinding) || 'Enter the fields below'}</code></dd></dl>
+                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields (optional override)</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={approvalValue(selectedFinding)} disabled={applying || requiresFetchXmlChange(selectedFinding)} /><small>{requiresFetchXmlChange(selectedFinding) ? 'Automatic remediation is disabled until every all-attributes query is replaced and the site is rescanned.' : 'The primary ID is used as the minimum allowlist when no code fields are found. Enter additional logical column names here when needed.'}</small></div>
+                    {selectedFinding.blockers.length > 0 && (requiresFetchXmlChange(selectedFinding) ? <><div className="blocker-panel"><strong>Code change required</strong><p>This FetchXML query uses <code>&lt;all-attributes /&gt;</code>, which Power Pages sends as attribute <code>*</code>. Replace it with explicit <code>&lt;attribute name="..." /&gt;</code> elements, then rescan before removing the wildcard.</p></div><div className="code-suggestion"><div><strong>Suggested FetchXML replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedFetchXmlAttributes(selectedFinding))}>Copy suggestion</Button></div><pre><code>{suggestedFetchXmlAttributes(selectedFinding)}</code></pre><p>This is a starting point based on columns detected in this entity's attributes, filters, and ordering. Add every column read by page rendering or business logic before rescanning. The auditor does not update customer code.</p></div></> : <div className="blocker-panel"><strong>Minimum allowlist selected</strong><p>No static Web API fields were found, so this update retains access only to <code>{minimumExplicitFields(selectedFinding.table)}</code>. Add fields above if this table is accessed dynamically.</p></div>)}
                     <h3>References ({selectedFinding.evidence.length})</h3>
                     <div className="evidence-list">{selectedFinding.evidence.map((evidence, index) => {
                       const sourceUrl = evidence.recordEntity && evidence.recordId ? recordUrl(selectedFinding.site, evidence.recordEntity, evidence.recordId) : ''
@@ -1017,7 +1043,7 @@ function App() {
                 ) : reviewView === 'updated' && selectedUpdatedFinding ? (
                   <>
                     <span className="step-label">VERIFIED UPDATE</span><h2>{selectedUpdatedFinding.settingName}</h2><p>{selectedUpdatedFinding.site.environment.name} / {selectedUpdatedFinding.site.name}</p>
-                    {recordUrl(selectedUpdatedFinding.site, selectedUpdatedFinding.settingRecordEntity, selectedUpdatedFinding.settingRecordId) && <Button as="a" href={recordUrl(selectedUpdatedFinding.site, selectedUpdatedFinding.settingRecordEntity, selectedUpdatedFinding.settingRecordId)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
+                    {siteSettingRecordUrl(selectedUpdatedFinding.site, selectedUpdatedFinding) && <Button as="a" href={siteSettingRecordUrl(selectedUpdatedFinding.site, selectedUpdatedFinding)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
                     <dl><dt>Previous wildcard value</dt><dd><code>{selectedUpdatedFinding.currentValue}</code></dd><dt>Verified explicit value</dt><dd><code>{selectedUpdatedFinding.proposedValue}</code></dd></dl>
                     {selectedUpdatedFinding.blockers.length > 0 && <div className="blocker-panel"><strong>Minimum allowlist was used</strong><p>The scan found no static Web API fields, so the verified update retained access only to <code>{minimumExplicitFields(selectedUpdatedFinding.table)}</code>.</p></div>}
                     <h3>References ({selectedUpdatedFinding.evidence.length})</h3>

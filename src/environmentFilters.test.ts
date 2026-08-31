@@ -11,6 +11,7 @@ const environment: EnvironmentTarget = {
   type: 'Sandbox',
   isProduction: false,
   isPersonalDeveloper: false,
+  isTrial: false,
 }
 
 describe('bulk environment lists', () => {

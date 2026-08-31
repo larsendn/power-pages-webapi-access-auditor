@@ -84,6 +84,50 @@ function addTextFields(files: SourceFile[], row: Record<string, unknown>, path: 
   }
 }
 
+function enhancedCodeRecord(
+  componentType: number,
+  content: Record<string, unknown>,
+  componentName: string,
+  payload: SiteConfigurationPayload,
+): { entity: string; id: string } | undefined {
+  const definitions: Record<number, Array<{ payloadKey: keyof SiteConfigurationPayload; entity: string; id: string; names: string[] }>> = {
+    2: [
+      { payloadKey: 'standardwebpagesjson', entity: 'adx_webpage', id: 'adx_webpageid', names: ['adx_partialurl', 'adx_name'] },
+      { payloadKey: 'modernwebpagesjson', entity: 'mspp_webpage', id: 'mspp_webpageid', names: ['mspp_partialurl', 'mspp_name'] },
+    ],
+    3: [
+      { payloadKey: 'standardwebfilesjson', entity: 'adx_webfile', id: 'adx_webfileid', names: ['adx_partialurl', 'adx_name'] },
+      { payloadKey: 'modernwebfilesjson', entity: 'mspp_webfile', id: 'mspp_webfileid', names: ['mspp_partialurl', 'mspp_name'] },
+    ],
+  }
+  const idHints = new Set(Object.entries(content)
+    .filter(([key, value]) => key.toLowerCase().endsWith('id') && typeof value === 'string')
+    .map(([, value]) => String(value).toLowerCase()))
+  const nameHints = new Set([componentName, text(content.name), text(content.partialurl)].filter(Boolean).map((value) => value.toLowerCase()))
+
+  for (const definition of definitions[componentType] ?? []) {
+    const rows = parseRows(payload[definition.payloadKey])
+    const idMatches = rows.filter((row) => idHints.has(text(row[definition.id]).toLowerCase()))
+    const matches = idMatches.length > 0 ? idMatches : rows.filter((row) => definition.names.some((field) => nameHints.has(text(row[field]).toLowerCase())))
+    if (matches.length === 1) return { entity: definition.entity, id: text(matches[0][definition.id]) }
+  }
+  return undefined
+}
+
+function enhancedSettingRecord(settingName: string, componentId: string, payload: SiteConfigurationPayload): { entity: 'adx_sitesetting' | 'mspp_sitesetting'; id: string } | undefined {
+  const definitions: Array<{ payloadKey: keyof SiteConfigurationPayload; entity: 'adx_sitesetting' | 'mspp_sitesetting'; id: string; name: string }> = [
+    { payloadKey: 'standardsettingsjson', entity: 'adx_sitesetting', id: 'adx_sitesettingid', name: 'adx_name' },
+    { payloadKey: 'modernsettingsjson', entity: 'mspp_sitesetting', id: 'mspp_sitesettingid', name: 'mspp_name' },
+  ]
+  for (const definition of definitions) {
+    const rows = parseRows(payload[definition.payloadKey])
+    const idMatches = rows.filter((row) => text(row[definition.id]).toLowerCase() === componentId.toLowerCase())
+    const matches = idMatches.length > 0 ? idMatches : rows.filter((row) => text(row[definition.name]).toLowerCase() === settingName.toLowerCase())
+    if (matches.length === 1) return { entity: definition.entity, id: text(matches[0][definition.id]) }
+  }
+  return undefined
+}
+
 function childRows(payload: SiteConfigurationPayload, parentPayload: keyof SiteConfigurationPayload, childPayload: keyof SiteConfigurationPayload, parentId: string, childParentIds: string[]) {
   const parentIds = new Set(parseRows(payload[parentPayload]).map((row) => text(row[parentId])).filter(Boolean))
   return parseRows(payload[childPayload]).filter((row) => childParentIds.some((field) => parentIds.has(text(row[field]))))
@@ -238,20 +282,25 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
       const name = text(row.name) || `component-${text(row.powerpagecomponentid)}`
       const settingName = text(content.name) || text(row.name)
       if (componentType === 9 && settingName) {
+        const navigationRecord = enhancedSettingRecord(settingName, text(row.powerpagecomponentid), payload)
         settings.push({
           name: settingName,
           value: text(content.value),
           recordId: text(row.powerpagecomponentid),
           recordEntity: 'powerpagecomponent',
+          navigationRecordEntity: navigationRecord?.entity,
+          navigationRecordId: navigationRecord?.id,
         })
       }
       if ([2, 7, 8, 15, 20].includes(componentType)) {
-        addTextFields(files, content, name, ['copy', 'customjavascript', 'source', 'registerstartupscript', 'value'], 'powerpagecomponent', text(row.powerpagecomponentid))
+        const record = enhancedCodeRecord(componentType, content, name, payload)
+        addTextFields(files, content, name, ['copy', 'customjavascript', 'source', 'registerstartupscript', 'value'], record?.entity, record?.id)
       }
       if (componentType === 3) {
         if (!isCodeWebFile(name)) continue
         const codeFile = codeFilesById.get(text(row.powerpagecomponentid))
-        if (codeFile) files.push({ path: codeFile.name || name, content: codeFile.content, recordEntity: 'powerpagecomponent', recordId: text(row.powerpagecomponentid) })
+        const record = enhancedCodeRecord(componentType, content, name, payload)
+        if (codeFile) files.push({ path: codeFile.name || name, content: codeFile.content, recordEntity: record?.entity, recordId: record?.id })
         else completenessBlockers.push(`Web file '${name}' was found, but its file-column bytes were not returned by the retrieve flow.`)
       }
     }

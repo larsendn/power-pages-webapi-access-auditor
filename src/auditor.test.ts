@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeSite, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, type SiteSetting } from './auditor'
+import { analyzeSite, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, suggestedFetchXmlAttributes, type SiteSetting } from './auditor'
 
 const wildcardSetting: SiteSetting = {
   name: 'Webapi/contact/fields',
@@ -61,6 +61,7 @@ describe('environment discovery', () => {
         type: 'Developer',
         isProduction: false,
         isPersonalDeveloper: true,
+        isTrial: false,
       },
       {
         id: 'environment-2',
@@ -71,6 +72,7 @@ describe('environment discovery', () => {
         type: 'Sandbox',
         isProduction: false,
         isPersonalDeveloper: false,
+        isTrial: false,
       },
       {
         id: 'environment-1',
@@ -81,39 +83,30 @@ describe('environment discovery', () => {
         type: '',
         isProduction: true,
         isPersonalDeveloper: false,
+        isTrial: false,
       },
     ])
   })
 
-  it('filters Teams and trial environments while retaining ordinary Dataverse environments with those words in the name', () => {
-    expect(parseAccessibleEnvironments([
+  it('filters Teams environments and classifies trial environments for optional hiding', () => {
+    const parsed = parseAccessibleEnvironments([
       { name: 'environment-without-dataverse', properties: { displayName: 'Teams only' } },
       { name: 'explicit-teams', properties: { displayName: 'Collaboration', environmentSku: 'Teams' } },
       { name: 'trial-without-dataverse', properties: { displayName: 'Trial only' } },
       { name: 'explicit-trial', properties: { displayName: 'Evaluation', environmentType: 'Trial' } },
       { name: 'dataverse-teams-project', properties: { displayName: 'Teams Project', environmentType: 'Sandbox', environmentUrl: 'https://teams-project.crm.dynamics.com' } },
       { name: 'dataverse-trial-project', properties: { displayName: 'Trial Migration', environmentType: 'Sandbox', environmentUrl: 'https://trial-project.crm.dynamics.com' } },
-    ])).toEqual([
-      {
-        id: 'dataverse-teams-project',
-        name: 'Teams Project',
-        target: 'https://teams-project.crm.dynamics.com',
-        url: 'https://teams-project.crm.dynamics.com',
-        sku: '',
-        type: 'Sandbox',
-        isProduction: false,
-        isPersonalDeveloper: false,
-      },
-      {
-        id: 'dataverse-trial-project',
-        name: 'Trial Migration',
-        target: 'https://trial-project.crm.dynamics.com',
-        url: 'https://trial-project.crm.dynamics.com',
-        sku: '',
-        type: 'Sandbox',
-        isProduction: false,
-        isPersonalDeveloper: false,
-      },
+    ])
+
+    expect(parsed.map((environment) => environment.id)).toEqual([
+      'explicit-trial',
+      'dataverse-teams-project',
+      'dataverse-trial-project',
+      'trial-without-dataverse',
+    ])
+    expect(parsed.filter((environment) => environment.isTrial).map((environment) => environment.id)).toEqual([
+      'explicit-trial',
+      'trial-without-dataverse',
     ])
   })
 })
@@ -176,6 +169,43 @@ describe('browser analyzer', () => {
 
     expect(findings[0].confidence).toBe('high')
     expect(findings[0].proposedFields).toEqual(['lastname'])
+  })
+
+  it('blocks FetchXML all-attributes and keeps nested entity fields scoped to their tables', () => {
+    const findings = analyzeSite([
+      wildcardSetting,
+      { ...wildcardSetting, name: 'Webapi/account/fields', recordId: 'setting-2' },
+    ], [{
+      path: 'web-pages/attendance.js',
+      content: `
+        const fetchXml = '<fetch>' +
+          '<entity name="contact">' +
+            '<all-attributes />' +
+            '<filter><condition attribute="statecode" operator="eq" value="0" /></filter>' +
+            '<link-entity name="account" from="accountid" to="parentcustomerid" alias="account">' +
+              '<attribute name="name" />' +
+            '</link-entity>' +
+          '</entity>' +
+        '</fetch>'
+      `,
+    }])
+
+    expect(findings[0].confidence).toBe('blocked')
+    expect(findings[0].proposedFields).toEqual(['statecode'])
+    expect(findings[0].blockers.join(' ')).toContain('FetchXML uses <all-attributes />')
+    expect(findings[0].evidence).toEqual(expect.arrayContaining([expect.objectContaining({ field: '*', source: 'fetchxml' })]))
+    expect(suggestedFetchXmlAttributes(findings[0])).toBe('<attribute name="statecode" />')
+    expect(findings[1].confidence).toBe('high')
+    expect(findings[1].proposedFields).toEqual(['name'])
+  })
+
+  it('uses an explicit placeholder when no safe FetchXML attributes can be inferred', () => {
+    const findings = analyzeSite([wildcardSetting], [{
+      path: 'web-pages/contacts.js',
+      content: '<fetch><entity name="contact"><all-attributes /></entity></fetch>',
+    }])
+
+    expect(suggestedFetchXmlAttributes(findings[0])).toBe('<attribute name="required_column_logical_name" />')
   })
 
   it('blocks every proposal when a dynamic Web API table cannot be associated', () => {

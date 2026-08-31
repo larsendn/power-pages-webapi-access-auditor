@@ -118,7 +118,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('adx_we','bpages')",
-              "$select": "adx_webpageid,adx_name,adx_copy,adx_customjavascript,adx_customcss",
+              "$select": "adx_webpageid,adx_name,adx_partialurl,adx_copy,adx_customjavascript,adx_customcss",
               "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
             },
             "authentication": {
@@ -347,7 +347,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('mspp_w','ebpages')",
-              "$select": "mspp_webpageid,mspp_name,mspp_copy,mspp_customjavascript,mspp_customcss",
+              "$select": "mspp_webpageid,mspp_name,mspp_partialurl,mspp_copy,mspp_customjavascript,mspp_customcss",
               "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
             },
             "authentication": {

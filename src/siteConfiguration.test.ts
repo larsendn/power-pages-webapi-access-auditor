@@ -17,11 +17,13 @@ describe('site configuration analysis', () => {
         { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'fields', content: JSON.stringify({ name: 'Webapi/contact/fields', value: '*' }) },
         { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Contacts', content: JSON.stringify({ customjavascript: "fetch('/_api/contacts?$select=firstname,lastname')" }) },
       ]),
+      standardwebpagesjson: JSON.stringify([{ adx_webpageid: 'physical-page-1', adx_name: 'Contacts' }]),
     })
 
     expect(result.sourceCount).toBe(1)
     expect(result.findings[0].confidence).toBe('high')
     expect(result.findings[0].proposedFields).toEqual(['firstname', 'lastname'])
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({ recordEntity: 'adx_webpage', recordId: 'physical-page-1' }))
   })
 
   it('reads an Enhanced site-setting name from the component row', () => {
@@ -35,6 +37,35 @@ describe('site configuration analysis', () => {
     expect(result.findings).toHaveLength(1)
     expect(result.findings[0].settingName).toBe('Webapi/contact/fields')
     expect(result.findings[0].proposedFields).toEqual(['firstname'])
+  })
+
+  it('keeps the Enhanced component mutation ID but links its physical site-setting record', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'component-setting-1', powerpagecomponenttype: 9, name: 'Webapi/contact/fields', content: JSON.stringify({ value: '*' }) },
+        { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Contacts', content: JSON.stringify({ customjavascript: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+      modernsettingsjson: JSON.stringify([{ mspp_sitesettingid: 'physical-setting-1', mspp_name: 'Webapi/contact/fields', mspp_value: '*' }]),
+    })
+
+    expect(result.findings[0]).toEqual(expect.objectContaining({
+      settingRecordId: 'component-setting-1',
+      settingRecordEntity: 'powerpagecomponent',
+      settingNavigationRecordEntity: 'mspp_sitesetting',
+      settingNavigationRecordId: 'physical-setting-1',
+    }))
+  })
+
+  it('does not expose a component URL when an Enhanced physical site-setting record cannot be resolved', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'component-setting-1', powerpagecomponenttype: 9, name: 'Webapi/contact/fields', content: JSON.stringify({ value: '*' }) },
+        { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Contacts', content: JSON.stringify({ customjavascript: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+    })
+
+    expect(result.findings[0].settingNavigationRecordEntity).toBeUndefined()
+    expect(result.findings[0].settingNavigationRecordId).toBeUndefined()
   })
 
   it('analyzes Enhanced content snippets', () => {
@@ -67,12 +98,36 @@ describe('site configuration analysis', () => {
         { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'fields', content: JSON.stringify({ name: 'Webapi/contact/fields', value: '*' }) },
         { powerpagecomponentid: 'file-1', powerpagecomponenttype: 3, name: 'contacts.js', content: JSON.stringify({ partialurl: 'contacts.js' }) },
       ]),
+      standardwebfilesjson: JSON.stringify([{ adx_webfileid: 'physical-file-1', adx_name: 'contacts.js', adx_partialurl: 'contacts.js' }]),
     }, [{ id: 'file-1', name: 'contacts.js', content: "fetch('/_api/contacts?$select=mobilephone')" }])
 
     expect(result.findings[0].confidence).toBe('high')
     expect(result.findings[0].proposedFields).toEqual(['mobilephone'])
-    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({ recordEntity: 'powerpagecomponent', recordId: 'file-1' }))
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({ recordEntity: 'adx_webfile', recordId: 'physical-file-1' }))
     expect(result.completenessBlockers).toEqual([])
+  })
+
+  it('does not link Enhanced code to a generic site component when no physical record resolves', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'fields', content: JSON.stringify({ name: 'Webapi/contact/fields', value: '*' }) },
+        { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Contacts', content: JSON.stringify({ customjavascript: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+    })
+
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({ recordEntity: undefined, recordId: undefined }))
+  })
+
+  it('resolves an Enhanced page by partial URL when its physical record name differs', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'fields', content: JSON.stringify({ name: 'Webapi/contact/fields', value: '*' }) },
+        { powerpagecomponentid: 'page-1', powerpagecomponenttype: 2, name: 'Information: Submission Details', content: JSON.stringify({ partialurl: 'submission-details', customjavascript: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+      standardwebpagesjson: JSON.stringify([{ adx_webpageid: 'physical-page-1', adx_name: 'Submission Details', adx_partialurl: 'submission-details' }]),
+    })
+
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({ recordEntity: 'adx_webpage', recordId: 'physical-page-1' }))
   })
 
   it('analyzes standard settings and configured code records', () => {

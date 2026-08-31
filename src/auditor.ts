@@ -14,6 +14,8 @@ export interface SiteSetting {
   value: string
   recordId: string
   recordEntity: 'adx_sitesetting' | 'mspp_sitesetting' | 'powerpagecomponent'
+  navigationRecordEntity?: 'adx_sitesetting' | 'mspp_sitesetting'
+  navigationRecordId?: string
 }
 
 export interface FieldEvidence {
@@ -31,6 +33,8 @@ export interface TableFinding {
   settingName: string
   settingRecordId: string
   settingRecordEntity: SiteSetting['recordEntity']
+  settingNavigationRecordEntity?: SiteSetting['navigationRecordEntity']
+  settingNavigationRecordId?: string
   currentValue: string
   proposedFields: string[]
   evidence: FieldEvidence[]
@@ -47,6 +51,7 @@ export interface EnvironmentTarget {
   type: string
   isProduction: boolean
   isPersonalDeveloper: boolean
+  isTrial: boolean
 }
 
 interface ApiReference {
@@ -55,6 +60,7 @@ interface ApiReference {
   line: number
   fields: Omit<FieldEvidence, 'file' | 'line'>[]
   hasStaticQuery: boolean
+  usesAllAttributes?: boolean
 }
 
 const QUERY_KEYS = new Set(['$select', '$filter', '$orderby', '$expand'])
@@ -76,7 +82,7 @@ function isExcludedEnvironment(row: Record<string, unknown>): boolean {
   const properties = object(row.properties)
   const linkedMetadata = object(properties.linkedEnvironmentMetadata)
   const environmentKind = `${stringValue(properties.environmentSku, row.environmentSku)} ${stringValue(properties.environmentType, row.environmentType)}`
-  if (/\b(teams|trial)\b/i.test(environmentKind)) return true
+  if (/\bteams\b/i.test(environmentKind)) return true
 
   const url = stringValue(
     linkedMetadata.instanceUrl,
@@ -90,7 +96,7 @@ function isExcludedEnvironment(row: Record<string, unknown>): boolean {
     row.url,
   )
   const name = stringValue(properties.displayName, row.displayName, row.name)
-  return !url && /\b(teams|trial)\b/i.test(name)
+  return !url && /\bteams\b/i.test(name)
 }
 
 export function parseAccessibleEnvironments(rows: Record<string, unknown>[]): EnvironmentTarget[] {
@@ -111,16 +117,18 @@ export function parseAccessibleEnvironments(rows: Record<string, unknown>[]): En
     const sku = stringValue(properties.environmentSku, row.environmentSku)
     const type = stringValue(properties.environmentType, row.environmentType)
     const environmentKind = `${sku} ${type}`
+    const name = stringValue(properties.displayName, row.displayName, row.name) || 'Unnamed environment'
 
     return {
       id: stringValue(row.name, row.id),
-      name: stringValue(properties.displayName, row.displayName, row.name) || 'Unnamed environment',
+      name,
       target: url || stringValue(row.name, row.id),
       url,
       sku,
       type,
       isProduction: /production/i.test(environmentKind),
       isPersonalDeveloper: /\bdeveloper\b/i.test(environmentKind),
+      isTrial: /\btrial\b/i.test(environmentKind) || (!url && /\btrial\b/i.test(name)),
     }
   })
     .filter((environment) => environment.id && environment.target)
@@ -191,18 +199,43 @@ function payloadFields(context: string): Omit<FieldEvidence, 'file' | 'line'>[] 
 
 function fetchXmlReferences(source: string, file: string): ApiReference[] {
   const references: ApiReference[] = []
-  for (const match of source.matchAll(/<(entity|link-entity)\b[^>]*\bname=["']([^"']+)["'][^>]*>([\s\S]*?)<\/\1>/gi)) {
-    const fields = [
-      ...[...match[3].matchAll(/<attribute\b[^>]*\bname=["']([^"']+)["']/gi)].map((item) => item[1]),
-      ...[...match[3].matchAll(/<(?:condition|order)\b[^>]*\battribute=["']([^"']+)["']/gi)].map((item) => item[1]),
-    ].map((field) => ({ field, source: 'fetchxml' as const, confidence: 'high' as const }))
-    references.push({
-      entitySet: match[2],
-      file,
-      line: source.slice(0, match.index).split(/\r?\n/).length,
-      fields,
-      hasStaticQuery: fields.length > 0,
-    })
+  const stack: ApiReference[] = []
+  const tags = /<\/?(?:entity|link-entity)\b[^>]*>|<(?:attribute|condition|order|all-attributes)\b[^>]*>/gi
+  for (const match of source.matchAll(tags)) {
+    const tag = match[0]
+    const closingEntity = tag.match(/^<\/(?:entity|link-entity)\b/i)
+    if (closingEntity) {
+      const reference = stack.pop()
+      if (reference) references.push(reference)
+      continue
+    }
+
+    const entity = tag.match(/^<(?:entity|link-entity)\b[^>]*\bname=["']([^"']+)["']/i)
+    if (entity) {
+      stack.push({
+        entitySet: entity[1],
+        file,
+        line: source.slice(0, match.index).split(/\r?\n/).length,
+        fields: [],
+        hasStaticQuery: false,
+      })
+      continue
+    }
+
+    const current = stack.at(-1)
+    if (!current) continue
+    if (/^<all-attributes\b/i.test(tag)) {
+      current.usesAllAttributes = true
+      current.hasStaticQuery = true
+      current.fields.push({ field: '*', source: 'fetchxml', confidence: 'high' })
+      continue
+    }
+    const field = tag.match(/^<attribute\b[^>]*\bname=["']([^"']+)["']/i)?.[1]
+      ?? tag.match(/^<(?:condition|order)\b[^>]*\battribute=["']([^"']+)["']/i)?.[1]
+    if (field) {
+      current.fields.push({ field, source: 'fetchxml', confidence: 'high' })
+      current.hasStaticQuery = true
+    }
   }
   return references
 }
@@ -252,11 +285,14 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
         recordEntity: files.find((file) => file.path === reference.file)?.recordEntity,
         recordId: files.find((file) => file.path === reference.file)?.recordId,
       })))
-      const proposedFields = [...new Set(evidence.map((item) => item.field))].sort()
+      const proposedFields = [...new Set(evidence.map((item) => item.field).filter((field) => field !== '*'))].sort()
       const blockers: string[] = []
       if (matches.length === 0) blockers.push('No static Web API request could be matched to this table.')
       if (matches.some((reference) => !reference.hasStaticQuery)) {
         blockers.push('At least one request has no fully static query; its returned fields cannot be inferred safely.')
+      }
+      if (matches.some((reference) => reference.usesAllAttributes)) {
+        blockers.push('FetchXML uses <all-attributes />. Replace it with explicit <attribute name="..." /> elements, then rescan before removing the wildcard.')
       }
       if (unresolvedReferences.length > 0) blockers.push(`${unresolvedReferences.length} Web API request${unresolvedReferences.length === 1 ? ' uses' : 's use'} a dynamic table name and could not be associated with a field setting.`)
       if (proposedFields.length === 0) blockers.push('No fields were inferred from static OData query options.')
@@ -266,6 +302,8 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
         settingName: setting.name,
         settingRecordId: setting.recordId,
         settingRecordEntity: setting.recordEntity,
+        settingNavigationRecordEntity: setting.navigationRecordEntity,
+        settingNavigationRecordId: setting.navigationRecordId,
         currentValue: setting.value,
         proposedFields,
         evidence,
@@ -273,4 +311,9 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
         blockers,
       }
     })
+}
+
+export function suggestedFetchXmlAttributes(finding: TableFinding): string {
+  const fields = finding.proposedFields.length > 0 ? finding.proposedFields : ['required_column_logical_name']
+  return fields.map((field) => `<attribute name="${field}" />`).join('\n')
 }

@@ -1,6 +1,6 @@
 param(
     [string]$SolutionSource = (Join-Path $PSScriptRoot "..\solution\PowerPagesWebApiFieldsAuditor\src"),
-    [string]$Version = "1.6.0.16"
+    [string]$Version = "1.6.0.17"
 )
 
 $ErrorActionPreference = "Stop"
@@ -312,7 +312,7 @@ $standardFilter = "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
 $modernFilter = "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
 Add-ListAction $retrieveActions "List_Enhanced_Components" "powerpagecomponents" "powerpagecomponentid,name,powerpagecomponenttype,content" $enhancedFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Settings" "adx_sitesettings" "adx_sitesettingid,adx_name,adx_value" $standardFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Standard_Web_Pages" "adx_webpages" "adx_webpageid,adx_name,adx_copy,adx_customjavascript,adx_customcss" $standardFilter "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Standard_Web_Pages" "adx_webpages" "adx_webpageid,adx_name,adx_partialurl,adx_copy,adx_customjavascript,adx_customcss" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Web_Templates" "adx_webtemplates" "adx_webtemplateid,adx_name,adx_source" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Basic_Forms" "adx_entityforms" "adx_entityformid,adx_name,adx_registerstartupscript" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Multistep_Forms" "adx_webforms" "adx_webformid,adx_name" $standardFilter "@triggerBody()?['targetEnvironment']"
@@ -323,7 +323,7 @@ Add-ListAction $retrieveActions "List_Standard_Table_Permissions" "adx_entityper
 Add-ListAction $retrieveActions "List_Standard_Web_Roles" "adx_webroles" "adx_webroleid,adx_name,adx_anonymoususersrole" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Permission_Roles" "adx_entitypermission_webroleset" "adx_entitypermissionid,adx_webroleid" -Organization "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Settings" "mspp_sitesettings" "mspp_sitesettingid,mspp_name,mspp_value" $modernFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Modern_Web_Pages" "mspp_webpages" "mspp_webpageid,mspp_name,mspp_copy,mspp_customjavascript,mspp_customcss" $modernFilter "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Modern_Web_Pages" "mspp_webpages" "mspp_webpageid,mspp_name,mspp_partialurl,mspp_copy,mspp_customjavascript,mspp_customcss" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Web_Templates" "mspp_webtemplates" "mspp_webtemplateid,mspp_name,mspp_source" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Basic_Forms" "mspp_entityforms" "mspp_entityformid,mspp_name,mspp_registerstartupscript" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Multistep_Forms" "mspp_webforms" "mspp_webformid,mspp_name" $modernFilter "@triggerBody()?['targetEnvironment']"

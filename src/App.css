@@ -164,6 +164,10 @@ main { min-width: 0; padding: 32px clamp(24px, 4vw, 64px) 56px; }
 .finding-detail h3 { margin: 24px 0 10px; font: 700 15px/1.2 Georgia, 'Times New Roman', serif; }
 .blocker-panel { margin-top: 18px; padding: 14px; color: #6b4600; background: #fff6df; border-left: 3px solid var(--amber); }
 .blocker-panel p { margin: 7px 0 0; font-size: 12px; line-height: 1.45; }
+.code-suggestion { margin-top: 14px; padding: 14px; background: #f3f6f5; border: 1px solid var(--line); }
+.code-suggestion > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.code-suggestion pre { margin: 10px 0; padding: 12px; overflow: auto; color: #dbe8e2; background: #17212b; font: 12px/1.55 Consolas, monospace; white-space: pre-wrap; }
+.code-suggestion p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .evidence-list { display: grid; max-height: 310px; overflow: auto; border: 1px solid var(--line); }
 .evidence-row { padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .evidence-row:last-child { border-bottom: 0; }
