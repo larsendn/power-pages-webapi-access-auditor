@@ -16,7 +16,7 @@ import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isAc
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
 import { wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
-import { analyzeConfiguration, isCodeWebFile, parseRows, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
+import { analyzeConfiguration, isCodeWebFile, parseRows, siteModelLabel, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
 import powerPagesLogo from './assets/power-pages-logo.png'
 import './App.css'
 
@@ -39,7 +39,7 @@ const DETECTION_PROFILES: { value: DetectionConcurrency; label: string }[] = [
   { value: 9, label: 'Fast' },
 ]
 const CHANGE_HISTORY_KEY = 'ppwfaChangeHistoryV1'
-const REVIEW_WORKSPACE_KEY = 'ppwfaReviewWorkspaceV2'
+const REVIEW_WORKSPACE_KEY = 'ppwfaReviewWorkspaceV3'
 
 function loadChangeHistory(): ChangeHistoryRecord[] {
   try {
@@ -624,18 +624,16 @@ function App() {
         debugLogger.info('site.discovery.actions', { environmentId: environment.id, diagnostics: discoveryDiagnostics })
         const discoveryFailure = siteDiscoveryFailure(discovered)
         if (discoveryFailure) throw new Error(discoveryFailure)
-        const modernSiteIds = new Set<string>()
+        const claimedSiteIds = new Set<string>()
         const modernSites = claimUniqueSites(parseRows(discovered.modernsitesjson).map((row): PowerPagesSite => ({
           id: text(row.mspp_websiteid), name: text(row.mspp_name) || 'Unnamed site', url: text(row.mspp_primarydomainname), model: 'Modern', environment, active: isActiveSiteRecord(row),
-        })), modernSiteIds)
-        const enhancedSiteIds = new Set<string>()
+        })), claimedSiteIds)
         const enhancedSites = claimUniqueSites(parseRows(discovered.enhancedandcodesitesjson).map((row): PowerPagesSite => ({
           id: text(row.powerpagesiteid), name: text(row.name) || 'Unnamed site', url: text(row.primarydomainname), model: 'Enhanced', environment, active: isActiveSiteRecord(row),
-        })), enhancedSiteIds)
-        const standardSiteIds = new Set<string>()
+        })), claimedSiteIds)
         const standardSites = claimUniqueSites(parseRows(discovered.standardsitesjson).map((row): PowerPagesSite => ({
           id: text(row.adx_websiteid), name: text(row.adx_name) || 'Unnamed site', url: text(row.adx_primarydomainname), model: 'Standard', environment, active: isActiveSiteRecord(row),
-        })), standardSiteIds)
+        })), claimedSiteIds)
         const discoveredSites = [...modernSites, ...enhancedSites, ...standardSites].filter((candidate) => candidate.id)
         const sitesToScan = ignoreInactiveSites ? discoveredSites.filter((site) => site.active) : discoveredSites
         debugLogger.info('site.discovery.completed', { environmentId: environment.id, modernSites: modernSites.length, enhancedSites: enhancedSites.length, standardSites: standardSites.length, inactiveSitesIgnored: discoveredSites.length - sitesToScan.length, elapsedMs: Math.round(performance.now() - environmentStartedAt) })
@@ -982,9 +980,9 @@ function App() {
                       <div className="wildcard-site-heading">
                         <div className="wildcard-site-heading-main">
                           <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
-                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
+                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{siteModelLabel(group.site.model)}</Badge></strong><span>{group.site.environment.name} · {siteModelLabel(group.site.model)} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
                         </div>
-                        <Checkbox label={`Select all for ${group.site.name} (${group.site.model === 'Standard' ? 'SDM' : 'EDM'})`} checked={approvalSelectionState(group.findings)} disabled={applying || group.findings.every(requiresFetchXmlChange)} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
+                        <Checkbox label={`Select all for ${group.site.name} (${siteModelLabel(group.site.model)})`} checked={approvalSelectionState(group.findings)} disabled={applying || group.findings.every(requiresFetchXmlChange)} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
                       </div>
                       <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
@@ -1016,7 +1014,7 @@ function App() {
                       <div className="wildcard-site-heading">
                         <div className="wildcard-site-heading-main">
                           <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
-                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{group.site.model === 'Standard' ? 'SDM' : 'EDM'}</Badge></strong><span>{group.site.environment.name} · {group.site.model} · {group.findings.length} anonymous permission{group.findings.length === 1 ? '' : 's'}</span></div>
+                          <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{siteModelLabel(group.site.model)}</Badge></strong><span>{group.site.environment.name} · {siteModelLabel(group.site.model)} · {group.findings.length} anonymous permission{group.findings.length === 1 ? '' : 's'}</span></div>
                         </div>
                       </div>
                       <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
@@ -1063,7 +1061,7 @@ function App() {
                   </>
                 ) : reviewView === 'anonymous' && selectedAnonymousFinding ? (
                   <>
-                    <span className="step-label">ANONYMOUS TABLE ACCESS</span><h2>{selectedAnonymousFinding.permissionName}</h2><p>{selectedAnonymousFinding.site.environment.name} / {selectedAnonymousFinding.site.name} / {selectedAnonymousFinding.site.model === 'Standard' ? 'SDM' : 'EDM'} ({selectedAnonymousFinding.site.model})</p>
+                    <span className="step-label">ANONYMOUS TABLE ACCESS</span><h2>{selectedAnonymousFinding.permissionName}</h2><p>{selectedAnonymousFinding.site.environment.name} / {selectedAnonymousFinding.site.name} / {siteModelLabel(selectedAnonymousFinding.site.model)}</p>
                     {recordUrl(selectedAnonymousFinding.site, selectedAnonymousFinding.permissionRecordEntity, selectedAnonymousFinding.permissionRecordId) && <Button as="a" href={recordUrl(selectedAnonymousFinding.site, selectedAnonymousFinding.permissionRecordEntity, selectedAnonymousFinding.permissionRecordId)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open table permission record</Button>}
                     <dl>
                       <dt>Dataverse table</dt><dd><code>{selectedAnonymousFinding.table}</code></dd>
@@ -1091,7 +1089,7 @@ function App() {
                 {changeHistory.map((change) => <div className="undo-row" key={change.id}>
                   <div className="undo-copy">
                     <strong>{change.environmentName} / {change.siteName}</strong>
-                    <span>{change.settingName} · {change.model} · {new Date(change.changedAt).toLocaleString()}</span>
+                    <span>{change.settingName} · {siteModelLabel(change.model)} · {new Date(change.changedAt).toLocaleString()}</span>
                     <code>{change.previousValue} → {change.appliedValue}</code>
                     {undoMessages[change.id] && <small className={change.status === 'Undone' ? 'undo-success' : 'undo-error'}>{undoMessages[change.id]}</small>}
                   </div>

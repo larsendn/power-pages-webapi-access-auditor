@@ -76,14 +76,15 @@ describe('Power Pages presence', () => {
 })
 
 describe('Power Pages site model discovery', () => {
-  it('deduplicates rows within a model without collapsing migrated models', () => {
-    const modern = claimUniqueSites([{ id: 'SITE-1', model: 'Modern' }, { id: 'site-1', model: 'Modern' }], new Set())
-    const enhanced = claimUniqueSites([{ id: 'site-1', model: 'Enhanced' }, { id: 'site-2', model: 'Enhanced' }], new Set())
-    const standard = claimUniqueSites([{ id: 'SITE-1', model: 'Standard' }, { id: 'site-1', model: 'Standard' }, { id: 'site-3', model: 'Standard' }], new Set())
+  it('deduplicates site IDs across model representations in discovery order', () => {
+    const claimedIds = new Set<string>()
+    const modern = claimUniqueSites([{ id: 'SITE-1', model: 'Modern' }, { id: 'site-1', model: 'Modern' }], claimedIds)
+    const enhanced = claimUniqueSites([{ id: 'site-1', model: 'Enhanced' }, { id: 'site-2', model: 'Enhanced' }], claimedIds)
+    const standard = claimUniqueSites([{ id: 'SITE-1', model: 'Standard' }, { id: 'site-2', model: 'Standard' }, { id: 'site-3', model: 'Standard' }], claimedIds)
 
     expect(modern).toEqual([{ id: 'SITE-1', model: 'Modern' }])
-    expect(enhanced).toEqual([{ id: 'site-1', model: 'Enhanced' }, { id: 'site-2', model: 'Enhanced' }])
-    expect(standard).toEqual([{ id: 'SITE-1', model: 'Standard' }, { id: 'site-3', model: 'Standard' }])
+    expect(enhanced).toEqual([{ id: 'site-2', model: 'Enhanced' }])
+    expect(standard).toEqual([{ id: 'site-3', model: 'Standard' }])
   })
 
   it('identifies inactive sites and treats legacy flow rows as active', () => {

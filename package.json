@@ -2,7 +2,7 @@
   "name": "vite",
   "private": true,
   "version": "0.0.0",
-  "appVersion": "1.6.0.18",
+  "appVersion": "1.6.0.19",
   "type": "module",
   "scripts": {
     "dev": "vite",

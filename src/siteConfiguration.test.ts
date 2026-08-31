@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeConfiguration, isCodeWebFile } from './siteConfiguration'
+import { analyzeConfiguration, isCodeWebFile, siteModelLabel } from './siteConfiguration'
+
+describe('site model labels', () => {
+  it('labels standard records as SDM and both enhanced representations as EDM', () => {
+    expect(siteModelLabel('Standard')).toBe('SDM')
+    expect(siteModelLabel('Modern')).toBe('EDM')
+    expect(siteModelLabel('Enhanced')).toBe('EDM')
+  })
+})
 
 describe('site configuration analysis', () => {
   it('distinguishes code-bearing web files from static assets', () => {

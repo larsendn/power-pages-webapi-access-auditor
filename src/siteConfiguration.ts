@@ -2,6 +2,10 @@ import { analyzeSite, type SourceFile, type SiteSetting, type TableFinding } fro
 
 export type SiteModel = 'Standard' | 'Enhanced' | 'Modern'
 
+export function siteModelLabel(model: SiteModel): 'SDM' | 'EDM' {
+  return model === 'Standard' ? 'SDM' : 'EDM'
+}
+
 export interface SiteConfigurationPayload {
   retrievaldiagnostics?: string
   enhancedcomponentsjson?: string
