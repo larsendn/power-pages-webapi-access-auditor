@@ -56,6 +56,15 @@ export interface RetrievedCodeFile {
   id: string
   name: string
   content: string
+  sourcePath?: string
+  recordEntity?: string
+  recordId?: string
+}
+
+export interface PortalFormReference {
+  name: string
+  formName: string
+  entityName: string
 }
 
 export function parseRows(value?: string): Record<string, unknown>[] {
@@ -136,6 +145,45 @@ function enhancedSettingRecord(settingName: string, componentId: string, payload
 function childRows(payload: SiteConfigurationPayload, parentPayload: keyof SiteConfigurationPayload, childPayload: keyof SiteConfigurationPayload, parentId: string, childParentIds: string[]) {
   const parentIds = new Set(parseRows(payload[parentPayload]).map((row) => text(row[parentId])).filter(Boolean))
   return parseRows(payload[childPayload]).filter((row) => childParentIds.some((field) => parentIds.has(text(row[field]))))
+}
+
+function addPortalFormReference(references: PortalFormReference[], row: Record<string, unknown>, prefix: 'adx_' | 'mspp_', fallbackName: string) {
+  const formName = text(row[`${prefix}formname`])
+  const entityName = text(row[`${prefix}entityname`])
+  if (!formName || !entityName) return
+  references.push({ name: text(row[`${prefix}name`]) || fallbackName, formName, entityName })
+}
+
+export function portalFormReferences(model: SiteModel, payload: SiteConfigurationPayload): PortalFormReference[] {
+  const references: PortalFormReference[] = []
+  const addStandardRows = () => {
+    parseRows(payload.standardbasicformsjson).forEach((row) => addPortalFormReference(references, row, 'adx_', 'basic form'))
+    childRows(payload, 'standardmultistepformsjson', 'standardmultistepformstepsjson', 'adx_webformid', ['_adx_webform_value', '_adx_webformid_value'])
+      .forEach((row) => addPortalFormReference(references, row, 'adx_', 'multistep form step'))
+  }
+  const addModernRows = () => {
+    parseRows(payload.modernbasicformsjson).forEach((row) => addPortalFormReference(references, row, 'mspp_', 'basic form'))
+    childRows(payload, 'modernmultistepformsjson', 'modernmultistepformstepsjson', 'mspp_webformid', ['_mspp_webform_value', '_mspp_webformid_value'])
+      .forEach((row) => addPortalFormReference(references, row, 'mspp_', 'multistep form step'))
+  }
+
+  if (model === 'Standard') addStandardRows()
+  else if (model === 'Modern') addModernRows()
+  else {
+    addStandardRows()
+    addModernRows()
+    for (const row of parseRows(payload.enhancedcomponentsjson)) {
+      if (![15, 20].includes(Number(row.powerpagecomponenttype))) continue
+      const content = parseContent(row.content)
+      const formName = text(content.formname)
+      const entityName = text(content.entityname)
+      if (formName && entityName) references.push({ name: text(row.name) || 'form component', formName, entityName })
+    }
+  }
+
+  return references.filter((reference, index, all) => all.findIndex((candidate) =>
+    candidate.formName.toLowerCase() === reference.formName.toLowerCase()
+    && candidate.entityName.toLowerCase() === reference.entityName.toLowerCase()) === index)
 }
 
 function boolean(value: unknown): boolean {
@@ -253,10 +301,10 @@ export function isCodeWebFile(name: string): boolean {
   return /\.(?:js|mjs|cjs|ts|tsx|jsx|html?|liquid)$/i.test(name.trim())
 }
 
-export function analyzeConfiguration(model: SiteModel, payload: SiteConfigurationPayload, codeFiles: RetrievedCodeFile[] = []): SiteAnalysis {
+export function analyzeConfiguration(model: SiteModel, payload: SiteConfigurationPayload, codeFiles: RetrievedCodeFile[] = [], additionalCompletenessBlockers: string[] = []): SiteAnalysis {
   const settings: SiteSetting[] = []
   const files: SourceFile[] = []
-  const completenessBlockers: string[] = []
+  const completenessBlockers: string[] = [...additionalCompletenessBlockers]
   const componentPermissionFindings = model === 'Enhanced' || model === 'Modern'
     ? enhancedAnonymousPermissions(parseRows(payload.enhancedcomponentsjson))
     : []
@@ -279,6 +327,13 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
   const anonymousPermissionFindings = [...navigableComponentPermissionFindings, ...recordPermissionFindings]
     .filter((finding, index, all) => all.findIndex((candidate) => candidate.permissionRecordId.toLowerCase() === finding.permissionRecordId.toLowerCase()) === index)
   const codeFilesById = new Map(codeFiles.map((file) => [file.id, file]))
+
+  codeFiles.filter((file) => file.recordEntity === 'webresource').forEach((file) => files.push({
+    path: file.sourcePath || `Form web resource/${file.name}`,
+    content: file.content,
+    recordEntity: file.recordEntity,
+    recordId: file.recordId || file.id,
+  }))
 
   if (model === 'Enhanced') {
     for (const row of parseRows(payload.enhancedcomponentsjson)) {

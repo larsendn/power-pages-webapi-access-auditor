@@ -160,7 +160,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('adx_ent','ityforms')",
-              "$select": "adx_entityformid,adx_name,adx_registerstartupscript",
+              "$select": "adx_entityformid,adx_name,adx_formname,adx_entityname,adx_registerstartupscript",
               "$filter": "_adx_websiteid_value eq @{triggerBody()?['siteId']}"
             },
             "authentication": {
@@ -202,7 +202,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('adx_webf','ormsteps')",
-              "$select": "adx_webformstepid,adx_name,adx_registerstartupscript,_adx_webform_value"
+              "$select": "adx_webformstepid,adx_name,adx_formname,adx_entityname,adx_registerstartupscript,_adx_webform_value"
             },
             "authentication": {
               "type": "Raw",
@@ -389,7 +389,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('mspp_ent','ityforms')",
-              "$select": "mspp_entityformid,mspp_name,mspp_registerstartupscript",
+              "$select": "mspp_entityformid,mspp_name,mspp_formname,mspp_entityname,mspp_registerstartupscript",
               "$filter": "_mspp_websiteid_value eq @{triggerBody()?['siteId']}"
             },
             "authentication": {
@@ -431,7 +431,7 @@
             "parameters": {
               "organization": "@triggerBody()?['targetEnvironment']",
               "entityName": "@concat('mspp_web','formsteps')",
-              "$select": "mspp_webformstepid,mspp_name,mspp_registerstartupscript,_mspp_webform_value"
+              "$select": "mspp_webformstepid,mspp_name,mspp_formname,mspp_entityname,mspp_registerstartupscript,_mspp_webform_value"
             },
             "authentication": {
               "type": "Raw",

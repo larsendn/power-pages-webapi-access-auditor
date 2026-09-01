@@ -2,6 +2,19 @@
 
 Notable changes to the Power Pages Wildcard & Anonymous Access Auditor are recorded here. GitHub release packages and release-specific notes are available on the [Releases page](https://github.com/larsendn/power-pages-webapi-access-auditor/releases).
 
+## [1.6.0.21](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.21) - 2026-09-01
+
+### Added
+
+- An opt-in **Scan form web resources** source for selected-site scans.
+- Scoped discovery of embedded HTML and JavaScript web resources from Dataverse forms used by Power Pages basic forms and multistep form steps.
+- Recursive scanning of direct web-resource references from embedded HTML, with physical Web Resource record navigation in finding evidence.
+
+### Changed
+
+- Form-resource retrieval gaps become conservative review blockers without failing the rest of the site scan.
+- Model-driven form event libraries are excluded unless they are also embedded in a portal-rendered form control.
+
 ## [1.6.0.20](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.20) - 2026-09-01
 
 ### Added

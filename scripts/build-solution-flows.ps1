@@ -1,6 +1,6 @@
 param(
     [string]$SolutionSource = (Join-Path $PSScriptRoot "..\solution\PowerPagesWebApiFieldsAuditor\src"),
-    [string]$Version = "1.6.0.20"
+    [string]$Version = "1.6.0.21"
 )
 
 $ErrorActionPreference = "Stop"
@@ -314,9 +314,9 @@ Add-ListAction $retrieveActions "List_Enhanced_Components" "powerpagecomponents"
 Add-ListAction $retrieveActions "List_Standard_Settings" "adx_sitesettings" "adx_sitesettingid,adx_name,adx_value" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Web_Pages" "adx_webpages" "adx_webpageid,adx_name,adx_partialurl,adx_copy,adx_customjavascript,adx_customcss" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Web_Templates" "adx_webtemplates" "adx_webtemplateid,adx_name,adx_source" $standardFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Standard_Basic_Forms" "adx_entityforms" "adx_entityformid,adx_name,adx_registerstartupscript" $standardFilter "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Standard_Basic_Forms" "adx_entityforms" "adx_entityformid,adx_name,adx_formname,adx_entityname,adx_registerstartupscript" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Multistep_Forms" "adx_webforms" "adx_webformid,adx_name" $standardFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Standard_Multistep_Form_Steps" "adx_webformsteps" "adx_webformstepid,adx_name,adx_registerstartupscript,_adx_webform_value" -Organization "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Standard_Multistep_Form_Steps" "adx_webformsteps" "adx_webformstepid,adx_name,adx_formname,adx_entityname,adx_registerstartupscript,_adx_webform_value" -Organization "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Content_Snippets" "adx_contentsnippets" "adx_contentsnippetid,adx_name,adx_value" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Web_Files" "adx_webfiles" "adx_webfileid,adx_name,adx_partialurl" $standardFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Standard_Table_Permissions" "adx_entitypermissions" "adx_entitypermissionid,adx_entitylogicalname,adx_entityname,adx_scope,adx_read,adx_write,adx_create,adx_delete,adx_append,adx_appendto,_adx_parententitypermission_value" $standardFilter "@triggerBody()?['targetEnvironment']"
@@ -325,9 +325,9 @@ Add-ListAction $retrieveActions "List_Standard_Permission_Roles" "adx_entityperm
 Add-ListAction $retrieveActions "List_Modern_Settings" "mspp_sitesettings" "mspp_sitesettingid,mspp_name,mspp_value" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Web_Pages" "mspp_webpages" "mspp_webpageid,mspp_name,mspp_partialurl,mspp_copy,mspp_customjavascript,mspp_customcss" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Web_Templates" "mspp_webtemplates" "mspp_webtemplateid,mspp_name,mspp_source" $modernFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Modern_Basic_Forms" "mspp_entityforms" "mspp_entityformid,mspp_name,mspp_registerstartupscript" $modernFilter "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Modern_Basic_Forms" "mspp_entityforms" "mspp_entityformid,mspp_name,mspp_formname,mspp_entityname,mspp_registerstartupscript" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Multistep_Forms" "mspp_webforms" "mspp_webformid,mspp_name" $modernFilter "@triggerBody()?['targetEnvironment']"
-Add-ListAction $retrieveActions "List_Modern_Multistep_Form_Steps" "mspp_webformsteps" "mspp_webformstepid,mspp_name,mspp_registerstartupscript,_mspp_webform_value" -Organization "@triggerBody()?['targetEnvironment']"
+Add-ListAction $retrieveActions "List_Modern_Multistep_Form_Steps" "mspp_webformsteps" "mspp_webformstepid,mspp_name,mspp_formname,mspp_entityname,mspp_registerstartupscript,_mspp_webform_value" -Organization "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Content_Snippets" "mspp_contentsnippets" "mspp_contentsnippetid,mspp_name,mspp_value" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Web_Files" "mspp_webfiles" "mspp_webfileid,mspp_name,mspp_partialurl" $modernFilter "@triggerBody()?['targetEnvironment']"
 Add-ListAction $retrieveActions "List_Modern_Table_Permissions" "mspp_entitypermissions" "mspp_entitypermissionid,mspp_entitylogicalname,mspp_entityname,mspp_scope,mspp_read,mspp_write,mspp_create,mspp_delete,mspp_append,mspp_appendto,_mspp_parententitypermission_value" $modernFilter "@triggerBody()?['targetEnvironment']"
@@ -372,36 +372,76 @@ $flows.Retrieve = [ordered]@{
 }
 
 $codeFileActions = [ordered]@{}
-$codeFileActions["Is_Standard_Model"] = [ordered]@{
+$codeFileActions["Is_Form_Definition"] = [ordered]@{
     runAfter = [ordered]@{}
     type = "If"
-    expression = [ordered]@{ or = @(
-        [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "standard") },
-        [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "modern") }
-    ) }
+    expression = [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "formdefinition") }
     actions = [ordered]@{
-        List_Standard_Web_File_Annotations = New-DataverseAction "ListRecordsWithOrganization" ([ordered]@{
+        List_Matching_Main_Forms = New-DataverseAction "ListRecordsWithOrganization" ([ordered]@{
             organization = "@triggerBody()?['targetEnvironment']"
-            entityName = "annotations"
-            '$select' = "annotationid,filename,documentbody,mimetype"
-            '$filter' = "_objectid_value eq @{triggerBody()?['fileId']} and isdocument eq true"
+            entityName = "systemforms"
+            '$select' = "formid,name,objecttypecode,type,formxml"
+            '$filter' = "name eq '@{replace(triggerBody()?['fileName'],'''','''''')}' and objecttypecode eq '@{replace(triggerBody()?['fileId'],'''','''''')}' and type eq 2"
         })
-        Respond_Standard_Code_File = New-ResponseAction -RunAfter ([ordered]@{ List_Standard_Web_File_Annotations = @("Succeeded") }) -Body ([ordered]@{
-            filesJson = "@{string(body('List_Standard_Web_File_Annotations')?['value'])}"
+        Respond_Form_Definitions = New-ResponseAction -RunAfter ([ordered]@{ List_Matching_Main_Forms = @("Succeeded") }) -Body ([ordered]@{
+            filesJson = "@{string(body('List_Matching_Main_Forms')?['value'])}"
         })
     }
     else = [ordered]@{
         actions = [ordered]@{
-            Download_Enhanced_Web_File = New-DataverseAction "GetEntityFileImageFieldContentWithOrganization" ([ordered]@{
-                organization = "@triggerBody()?['targetEnvironment']"
-                entityName = "powerpagecomponents"
-                recordId = "@triggerBody()?['fileId']"
-                fileImageFieldName = "filecontent"
-                Range = "bytes=0-"
-            })
-            Respond_Enhanced_Code_File = New-ResponseAction -RunAfter ([ordered]@{ Download_Enhanced_Web_File = @("Succeeded") }) -Body ([ordered]@{
-                filesJson = "@{concat('[{`"filename`":`"',replace(triggerBody()?['fileName'],'`"',''), '`",`"documentbody`":`"',base64(body('Download_Enhanced_Web_File')),'`"}]')}"
-            })
+            Is_Web_Resource = [ordered]@{
+                runAfter = [ordered]@{}
+                type = "If"
+                expression = [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "webresource") }
+                actions = [ordered]@{
+                    List_Matching_Web_Resources = New-DataverseAction "ListRecordsWithOrganization" ([ordered]@{
+                        organization = "@triggerBody()?['targetEnvironment']"
+                        entityName = "webresourceset"
+                        '$select' = "webresourceid,name,displayname,webresourcetype,content"
+                        '$filter' = "name eq '@{replace(triggerBody()?['fileId'],'''','''''')}' and (webresourcetype eq 1 or webresourcetype eq 3)"
+                    })
+                    Respond_Web_Resources = New-ResponseAction -RunAfter ([ordered]@{ List_Matching_Web_Resources = @("Succeeded") }) -Body ([ordered]@{
+                        filesJson = "@{string(body('List_Matching_Web_Resources')?['value'])}"
+                    })
+                }
+                else = [ordered]@{
+                    actions = [ordered]@{
+                        Is_Standard_Model = [ordered]@{
+                            runAfter = [ordered]@{}
+                            type = "If"
+                            expression = [ordered]@{ or = @(
+                                [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "standard") },
+                                [ordered]@{ equals = @("@toLower(triggerBody()?['modelKind'])", "modern") }
+                            ) }
+                            actions = [ordered]@{
+                                List_Standard_Web_File_Annotations = New-DataverseAction "ListRecordsWithOrganization" ([ordered]@{
+                                    organization = "@triggerBody()?['targetEnvironment']"
+                                    entityName = "annotations"
+                                    '$select' = "annotationid,filename,documentbody,mimetype"
+                                    '$filter' = "_objectid_value eq @{triggerBody()?['fileId']} and isdocument eq true"
+                                })
+                                Respond_Standard_Code_File = New-ResponseAction -RunAfter ([ordered]@{ List_Standard_Web_File_Annotations = @("Succeeded") }) -Body ([ordered]@{
+                                    filesJson = "@{string(body('List_Standard_Web_File_Annotations')?['value'])}"
+                                })
+                            }
+                            else = [ordered]@{
+                                actions = [ordered]@{
+                                    Download_Enhanced_Web_File = New-DataverseAction "GetEntityFileImageFieldContentWithOrganization" ([ordered]@{
+                                        organization = "@triggerBody()?['targetEnvironment']"
+                                        entityName = "powerpagecomponents"
+                                        recordId = "@triggerBody()?['fileId']"
+                                        fileImageFieldName = "filecontent"
+                                        Range = "bytes=0-"
+                                    })
+                                    Respond_Enhanced_Code_File = New-ResponseAction -RunAfter ([ordered]@{ Download_Enhanced_Web_File = @("Succeeded") }) -Body ([ordered]@{
+                                        filesJson = "@{concat('[{`"filename`":`"',replace(triggerBody()?['fileName'],'`"',''), '`",`"documentbody`":`"',base64(body('Download_Enhanced_Web_File')),'`"}]')}"
+                                    })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -72,27 +72,17 @@
         }
       },
       "actions": {
-        "Is_Standard_Model": {
+        "Is_Form_Definition": {
           "runAfter": {},
           "type": "If",
           "expression": {
-            "or": [
-              {
-                "equals": [
-                  "@toLower(triggerBody()?['modelKind'])",
-                  "standard"
-                ]
-              },
-              {
-                "equals": [
-                  "@toLower(triggerBody()?['modelKind'])",
-                  "modern"
-                ]
-              }
+            "equals": [
+              "@toLower(triggerBody()?['modelKind'])",
+              "formdefinition"
             ]
           },
           "actions": {
-            "List_Standard_Web_File_Annotations": {
+            "List_Matching_Main_Forms": {
               "runAfter": {},
               "type": "OpenApiConnection",
               "inputs": {
@@ -103,9 +93,9 @@
                 },
                 "parameters": {
                   "organization": "@triggerBody()?['targetEnvironment']",
-                  "entityName": "@concat('annot','ations')",
-                  "$select": "annotationid,filename,documentbody,mimetype",
-                  "$filter": "_objectid_value eq @{triggerBody()?['fileId']} and isdocument eq true"
+                  "entityName": "@concat('syste','mforms')",
+                  "$select": "formid,name,objecttypecode,type,formxml",
+                  "$filter": "name eq '@{replace(triggerBody()?['fileName'],'''','''''')}' and objecttypecode eq '@{replace(triggerBody()?['fileId'],'''','''''')}' and type eq 2"
                 },
                 "authentication": {
                   "type": "Raw",
@@ -113,9 +103,9 @@
                 }
               }
             },
-            "Respond_Standard_Code_File": {
+            "Respond_Form_Definitions": {
               "runAfter": {
-                "List_Standard_Web_File_Annotations": [
+                "List_Matching_Main_Forms": [
                   "Succeeded"
                 ]
               },
@@ -124,7 +114,7 @@
               "inputs": {
                 "statusCode": 200,
                 "body": {
-                  "filesJson": "@{string(body('List_Standard_Web_File_Annotations')?['value'])}"
+                  "filesJson": "@{string(body('List_Matching_Main_Forms')?['value'])}"
                 },
                 "schema": {
                   "type": "object",
@@ -141,48 +131,182 @@
           },
           "else": {
             "actions": {
-              "Download_Enhanced_Web_File": {
+              "Is_Web_Resource": {
                 "runAfter": {},
-                "type": "OpenApiConnection",
-                "inputs": {
-                  "host": {
-                    "connectionName": "shared_commondataserviceforapps",
-                    "operationId": "GetEntityFileImageFieldContentWithOrganization",
-                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
-                  },
-                  "parameters": {
-                    "organization": "@triggerBody()?['targetEnvironment']",
-                    "entityName": "@concat('powerpage','components')",
-                    "recordId": "@triggerBody()?['fileId']",
-                    "fileImageFieldName": "filecontent",
-                    "Range": "bytes=0-"
-                  },
-                  "authentication": {
-                    "type": "Raw",
-                    "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
-                  }
-                }
-              },
-              "Respond_Enhanced_Code_File": {
-                "runAfter": {
-                  "Download_Enhanced_Web_File": [
-                    "Succeeded"
+                "type": "If",
+                "expression": {
+                  "equals": [
+                    "@toLower(triggerBody()?['modelKind'])",
+                    "webresource"
                   ]
                 },
-                "type": "Response",
-                "kind": "PowerApp",
-                "inputs": {
-                  "statusCode": 200,
-                  "body": {
-                    "filesJson": "@{concat('[{\"filename\":\"',replace(triggerBody()?['fileName'],'\"',''), '\",\"documentbody\":\"',base64(body('Download_Enhanced_Web_File')),'\"}]')}"
+                "actions": {
+                  "List_Matching_Web_Resources": {
+                    "runAfter": {},
+                    "type": "OpenApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_commondataserviceforapps",
+                        "operationId": "ListRecordsWithOrganization",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                      },
+                      "parameters": {
+                        "organization": "@triggerBody()?['targetEnvironment']",
+                        "entityName": "@concat('webreso','urceset')",
+                        "$select": "webresourceid,name,displayname,webresourcetype,content",
+                        "$filter": "name eq '@{replace(triggerBody()?['fileId'],'''','''''')}' and (webresourcetype eq 1 or webresourcetype eq 3)"
+                      },
+                      "authentication": {
+                        "type": "Raw",
+                        "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                      }
+                    }
                   },
-                  "schema": {
-                    "type": "object",
-                    "properties": {
-                      "filesJson": {
-                        "title": "filesJson",
-                        "type": "string",
-                        "x-ms-dynamically-added": true
+                  "Respond_Web_Resources": {
+                    "runAfter": {
+                      "List_Matching_Web_Resources": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Response",
+                    "kind": "PowerApp",
+                    "inputs": {
+                      "statusCode": 200,
+                      "body": {
+                        "filesJson": "@{string(body('List_Matching_Web_Resources')?['value'])}"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "filesJson": {
+                            "title": "filesJson",
+                            "type": "string",
+                            "x-ms-dynamically-added": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Is_Standard_Model": {
+                      "runAfter": {},
+                      "type": "If",
+                      "expression": {
+                        "or": [
+                          {
+                            "equals": [
+                              "@toLower(triggerBody()?['modelKind'])",
+                              "standard"
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@toLower(triggerBody()?['modelKind'])",
+                              "modern"
+                            ]
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "List_Standard_Web_File_Annotations": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "connectionName": "shared_commondataserviceforapps",
+                              "operationId": "ListRecordsWithOrganization",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "organization": "@triggerBody()?['targetEnvironment']",
+                              "entityName": "@concat('annot','ations')",
+                              "$select": "annotationid,filename,documentbody,mimetype",
+                              "$filter": "_objectid_value eq @{triggerBody()?['fileId']} and isdocument eq true"
+                            },
+                            "authentication": {
+                              "type": "Raw",
+                              "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                            }
+                          }
+                        },
+                        "Respond_Standard_Code_File": {
+                          "runAfter": {
+                            "List_Standard_Web_File_Annotations": [
+                              "Succeeded"
+                            ]
+                          },
+                          "type": "Response",
+                          "kind": "PowerApp",
+                          "inputs": {
+                            "statusCode": 200,
+                            "body": {
+                              "filesJson": "@{string(body('List_Standard_Web_File_Annotations')?['value'])}"
+                            },
+                            "schema": {
+                              "type": "object",
+                              "properties": {
+                                "filesJson": {
+                                  "title": "filesJson",
+                                  "type": "string",
+                                  "x-ms-dynamically-added": true
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Download_Enhanced_Web_File": {
+                            "runAfter": {},
+                            "type": "OpenApiConnection",
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_commondataserviceforapps",
+                                "operationId": "GetEntityFileImageFieldContentWithOrganization",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                              },
+                              "parameters": {
+                                "organization": "@triggerBody()?['targetEnvironment']",
+                                "entityName": "@concat('powerpage','components')",
+                                "recordId": "@triggerBody()?['fileId']",
+                                "fileImageFieldName": "filecontent",
+                                "Range": "bytes=0-"
+                              },
+                              "authentication": {
+                                "type": "Raw",
+                                "value": "@json(decodeBase64(triggerOutputs().headers['X-MS-APIM-Tokens']))['$ConnectionKey']"
+                              }
+                            }
+                          },
+                          "Respond_Enhanced_Code_File": {
+                            "runAfter": {
+                              "Download_Enhanced_Web_File": [
+                                "Succeeded"
+                              ]
+                            },
+                            "type": "Response",
+                            "kind": "PowerApp",
+                            "inputs": {
+                              "statusCode": 200,
+                              "body": {
+                                "filesJson": "@{concat('[{\"filename\":\"',replace(triggerBody()?['fileName'],'\"',''), '\",\"documentbody\":\"',base64(body('Download_Enhanced_Web_File')),'\"}]')}"
+                              },
+                              "schema": {
+                                "type": "object",
+                                "properties": {
+                                  "filesJson": {
+                                    "title": "filesJson",
+                                    "type": "string",
+                                    "x-ms-dynamically-added": true
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   }

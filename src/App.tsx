@@ -11,12 +11,13 @@ import { parseAccessibleEnvironments, suggestedFetchXmlAttributes, type AllAttri
 import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type ChangeHistoryRecord } from './changeHistory'
 import { flowErrorMessage } from './errorMessage'
 import { flowGateway } from './flowGateway'
+import { embeddedFormWebResourceNames, referencedHtmlWebResourceNames } from './formWebResources'
 import { minimumExplicitFields, normalizeExplicitFields } from './approval'
 import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isActiveSiteRecord, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
 import { restoreUndoneFinding, wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
-import { analyzeConfiguration, isCodeWebFile, parseRows, siteModelLabel, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
+import { analyzeConfiguration, isCodeWebFile, parseRows, portalFormReferences, siteModelLabel, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
 import powerPagesLogo from './assets/power-pages-logo.png'
 import './App.css'
 
@@ -225,6 +226,63 @@ async function retrieveCodeFiles(environment: EnvironmentTarget, model: SiteMode
   return files
 }
 
+async function retrieveFormWebResources(environment: EnvironmentTarget, model: SiteModel, configuration: SiteConfigurationPayload): Promise<{ files: RetrievedCodeFile[]; blockers: string[] }> {
+  const files: RetrievedCodeFile[] = []
+  const blockers: string[] = []
+  const retrievedNames = new Set<string>()
+
+  for (const form of portalFormReferences(model, configuration)) {
+    let response
+    try {
+      response = await flowGateway.retrieveCodeFile(environment.target, 'FormDefinition', form.entityName, form.formName)
+    } catch (error) {
+      blockers.push(`Form web-resource scan could not retrieve Dataverse form '${form.formName}' for table '${form.entityName}': ${errorMessage(error)}`)
+      continue
+    }
+    const definitions = parseRows(response.filesjson)
+    if (definitions.length === 0) {
+      blockers.push(`Form web-resource scan could not resolve Dataverse form '${form.formName}' for table '${form.entityName}'.`)
+      continue
+    }
+
+    const pending = definitions.flatMap((definition) => embeddedFormWebResourceNames(text(definition.formxml)))
+      .map((name) => ({ name, source: form.name }))
+    while (pending.length > 0) {
+      const resource = pending.shift()
+      if (!resource) continue
+      const key = resource.name.toLowerCase()
+      if (retrievedNames.has(key)) continue
+      retrievedNames.add(key)
+
+      let resourceResponse
+      try {
+        resourceResponse = await flowGateway.retrieveCodeFile(environment.target, 'WebResource', resource.name, resource.name)
+      } catch (error) {
+        blockers.push(`Form web resource '${resource.name}' referenced by '${resource.source}' could not be retrieved: ${errorMessage(error)}`)
+        continue
+      }
+      const record = parseRows(resourceResponse.filesjson).find((row) => text(row.content))
+      if (!record) {
+        blockers.push(`Form web resource '${resource.name}' referenced by '${resource.source}' could not be retrieved.`)
+        continue
+      }
+      try {
+        const content = decodeBase64(text(record.content))
+        const name = text(record.name) || resource.name
+        const id = text(record.webresourceid)
+        files.push({ id, name, content, sourcePath: `Form web resource/${resource.source}/${name}`, recordEntity: 'webresource', recordId: id })
+        if (Number(record.webresourcetype) === 1) {
+          referencedHtmlWebResourceNames(content).forEach((nestedName) => pending.push({ name: nestedName, source: resource.source }))
+        }
+      } catch {
+        blockers.push(`Form web resource '${resource.name}' referenced by '${resource.source}' returned invalid Base64 content.`)
+      }
+    }
+  }
+
+  return { files, blockers }
+}
+
 async function withTimeout<T>(operation: Promise<T>, message: string, milliseconds = 45_000): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
@@ -254,6 +312,7 @@ function App() {
   const [showOnlyPowerPages, setShowOnlyPowerPages] = useState(false)
   const [auditAnonymousAccess, setAuditAnonymousAccess] = useState(true)
   const [ignoreInactiveSites, setIgnoreInactiveSites] = useState(true)
+  const [scanFormWebResources, setScanFormWebResources] = useState(false)
   const [detectingPowerPages, setDetectingPowerPages] = useState(false)
   const [stoppingDetection, setStoppingDetection] = useState(false)
   const [detectionConcurrency, setDetectionConcurrency] = useState<DetectionConcurrency>(6)
@@ -507,6 +566,7 @@ function App() {
         setShowOnlyPowerPages(false)
         setAuditAnonymousAccess(true)
         setIgnoreInactiveSites(true)
+        setScanFormWebResources(false)
       })
       setNotice(nextEnvironments.length > 0
         ? { intent: 'success', text: `${nextEnvironments.length} accessible Dataverse environment${nextEnvironments.length === 1 ? '' : 's'} found.` }
@@ -671,7 +731,7 @@ function App() {
     setProgress({ current: 0, total: selectedEnvironments.length, message: 'Starting tenant scan' })
     const scannedSites: PowerPagesSite[] = []
     const scanErrors: string[] = []
-    debugLogger.info('site.scan.started', { environmentCount: selectedEnvironments.length, auditAnonymousAccess })
+    debugLogger.info('site.scan.started', { environmentCount: selectedEnvironments.length, auditAnonymousAccess, scanFormWebResources })
 
     for (let environmentIndex = 0; environmentIndex < selectedEnvironments.length; environmentIndex += 1) {
       if (run.cancelled) break
@@ -721,8 +781,11 @@ function App() {
               modernAssignments: parseRows(configuration.modernpermissionrolesjson).length,
             })
             const codeFiles = await retrieveCodeFiles(environment, site.model, configuration)
-            site.analysis = analyzeConfiguration(site.model, configuration, codeFiles)
-            debugLogger.info('site.analysis.completed', { environmentId: environment.id, siteId: site.id, codeFiles: codeFiles.length, sources: site.analysis.sourceCount, wildcardFindings: site.analysis.findings.length, allAttributesFindings: site.analysis.allAttributesFindings.length, anonymousFindings: site.analysis.anonymousPermissionFindings.length, blockers: site.analysis.completenessBlockers.length, elapsedMs: Math.round(performance.now() - siteStartedAt) })
+            const formResources = scanFormWebResources
+              ? await retrieveFormWebResources(environment, site.model, configuration)
+              : { files: [], blockers: [] }
+            site.analysis = analyzeConfiguration(site.model, configuration, [...codeFiles, ...formResources.files], formResources.blockers)
+            debugLogger.info('site.analysis.completed', { environmentId: environment.id, siteId: site.id, codeFiles: codeFiles.length, formWebResources: formResources.files.length, sources: site.analysis.sourceCount, wildcardFindings: site.analysis.findings.length, allAttributesFindings: site.analysis.allAttributesFindings.length, anonymousFindings: site.analysis.anonymousPermissionFindings.length, blockers: site.analysis.completenessBlockers.length, elapsedMs: Math.round(performance.now() - siteStartedAt) })
           } catch (error) {
             site.error = errorMessage(error)
             debugLogger.error('site.scan.failed', { environmentId: environment.id, siteId: site.id, siteName: site.name, model: site.model, message: site.error })
@@ -971,6 +1034,7 @@ function App() {
                     <Switch checked={pasteListEnabled} label="Paste environment list" onChange={(_, data) => togglePasteList(data.checked)} />
                     <Switch checked={auditAnonymousAccess} label="Audit anonymous table access" onChange={(_, data) => setAuditAnonymousAccess(data.checked)} />
                     <Switch checked={ignoreInactiveSites} label="Ignore inactive sites" onChange={(_, data) => setIgnoreInactiveSites(data.checked)} />
+                    <Switch checked={scanFormWebResources} label="Scan form web resources" onChange={(_, data) => setScanFormWebResources(data.checked)} />
                   </div>
                   <div className="power-pages-filter">
                     <div><strong>Power Pages presence</strong><span>Detect Standard and Enhanced Power Pages sites in the current environment filter.</span></div>

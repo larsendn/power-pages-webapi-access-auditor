@@ -2,7 +2,7 @@
   "name": "vite",
   "private": true,
   "version": "0.0.0",
-  "appVersion": "1.6.0.20",
+  "appVersion": "1.6.0.21",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "@fluentui/react-components": "^9.74.6",
     "@fluentui/react-icons": "^2.0.336",
     "@microsoft/power-apps": "^1.2.5",
+    "fast-xml-parser": "^5.11.0",
     "parse5": "^8.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

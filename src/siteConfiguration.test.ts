@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeConfiguration, isCodeWebFile, siteModelLabel } from './siteConfiguration'
+import { analyzeConfiguration, isCodeWebFile, portalFormReferences, siteModelLabel } from './siteConfiguration'
 
 describe('site model labels', () => {
   it('labels standard records as SDM and both enhanced representations as EDM', () => {
@@ -210,6 +210,45 @@ describe('site configuration analysis', () => {
     })
 
     expect(result.findings[0].proposedFields).toEqual(['firstname', 'lastname'])
+  })
+
+  it('collects and deduplicates physical forms used by a Standard site', () => {
+    const references = portalFormReferences('Standard', {
+      standardbasicformsjson: JSON.stringify([
+        { adx_name: 'Contact edit', adx_formname: 'Portal Contact', adx_entityname: 'contact' },
+        { adx_name: 'Contact duplicate', adx_formname: 'Portal Contact', adx_entityname: 'contact' },
+      ]),
+      standardmultistepformsjson: JSON.stringify([{ adx_webformid: 'flow-1' }]),
+      standardmultistepformstepsjson: JSON.stringify([
+        { adx_name: 'Application step', _adx_webform_value: 'flow-1', adx_formname: 'Portal Application', adx_entityname: 'new_application' },
+        { adx_name: 'Other site step', _adx_webform_value: 'flow-2', adx_formname: 'Other Form', adx_entityname: 'account' },
+      ]),
+    })
+
+    expect(references).toEqual([
+      { name: 'Contact edit', formName: 'Portal Contact', entityName: 'contact' },
+      { name: 'Application step', formName: 'Portal Application', entityName: 'new_application' },
+    ])
+  })
+
+  it('analyzes a retrieved form web resource and links its physical record', () => {
+    const result = analyzeConfiguration('Standard', {
+      standardsettingsjson: JSON.stringify([{ adx_sitesettingid: 'setting-1', adx_name: 'Webapi/contact/fields', adx_value: '*' }]),
+    }, [{
+      id: 'resource-1',
+      name: 'new_/contact-api.js',
+      sourcePath: 'Form web resource/Contact edit/new_/contact-api.js',
+      content: "fetch('/_api/contacts?$select=firstname,emailaddress1')",
+      recordEntity: 'webresource',
+      recordId: 'resource-1',
+    }])
+
+    expect(result.findings[0].proposedFields).toEqual(['emailaddress1', 'firstname'])
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({
+      file: 'Form web resource/Contact edit/new_/contact-api.js',
+      recordEntity: 'webresource',
+      recordId: 'resource-1',
+    }))
   })
 
   it('analyzes Standard content snippets', () => {

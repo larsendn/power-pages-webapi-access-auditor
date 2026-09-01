@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.6.0.20",
+    [string]$Version = "1.6.0.21",
     [Parameter(Mandatory = $true)]
     [Guid]$SolutionId,
     [string]$SolutionUniqueName = "PowerPagesWebApiFieldsAuditor"
@@ -165,6 +165,20 @@ try {
     Assert-LastCommandSucceeded "Lint failed."
     npm run build
     Assert-LastCommandSucceeded "The code app production build failed."
+
+    & (Join-Path $PSScriptRoot "build-solution-flows.ps1") -SolutionSource (Join-Path $solutionDirectory "PowerPagesWebApiFieldsAuditor\src") -Version $Version
+
+    $candidateDirectory = Join-Path ([IO.Path]::GetTempPath()) ("PPWFA-candidate-" + [Guid]::NewGuid())
+    New-Item -ItemType Directory -Path $candidateDirectory | Out-Null
+    try {
+        $candidatePath = Join-Path $candidateDirectory "PowerPagesWebApiFieldsAuditor_unmanaged.zip"
+        pac solution pack --zipfile $candidatePath --folder (Join-Path $solutionDirectory "PowerPagesWebApiFieldsAuditor\src") --packagetype Unmanaged
+        Assert-LastCommandSucceeded "Packing the unmanaged flow candidate failed."
+        pac solution import --environment $environmentId --path $candidatePath --publish-changes
+        Assert-LastCommandSucceeded "Importing the unmanaged flow candidate failed."
+    } finally {
+        Remove-Item $candidateDirectory -Recurse -Force -ErrorAction SilentlyContinue
+    }
 
     pac solution online-version --environment $environmentId --solution-name $SolutionUniqueName --solution-version $Version
     Assert-LastCommandSucceeded "Updating the online solution version failed."
