@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeSite, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, suggestedFetchXmlAttributes, type SiteSetting } from './auditor'
+import { analyzeSite, findAllAttributes, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, suggestedFetchXmlAttributes, type SiteSetting } from './auditor'
 
 const wildcardSetting: SiteSetting = {
   name: 'Webapi/contact/fields',
@@ -171,6 +171,24 @@ describe('browser analyzer', () => {
     expect(findings[0].proposedFields).toEqual(['lastname'])
   })
 
+  it('keeps a no-select fetch blocked when the whole response object escapes to its caller', () => {
+    const setting = { ...wildcardSetting, name: 'Webapi/dmh_sschools/fields' }
+    const findings = analyzeSite([setting], [{
+      path: 'web-pages/school.js',
+      content: `
+        async function getSchoolInfo(schoolId) {
+          const response = await fetch(\`/_api/dmh_sschoolses(\${schoolId})\`, { headers: { Accept: 'application/json' } })
+          const data = await response.json()
+          return data
+        }
+      `,
+    }])
+
+    expect(findings[0].confidence).toBe('blocked')
+    expect(findings[0].proposedFields).toEqual([])
+    expect(findings[0].blockers).toContain('At least one request has no fully static query; its returned fields cannot be inferred safely.')
+  })
+
   it('blocks FetchXML all-attributes and keeps nested entity fields scoped to their tables', () => {
     const findings = analyzeSite([
       wildcardSetting,
@@ -206,6 +224,32 @@ describe('browser analyzer', () => {
     }])
 
     expect(suggestedFetchXmlAttributes(findings[0])).toBe('<attribute name="required_column_logical_name" />')
+  })
+
+  it('reports FetchXML all-attributes after the matching wildcard setting is fixed', () => {
+    const findings = findAllAttributes([{
+      ...wildcardSetting,
+      value: 'fullname,contactid',
+      navigationRecordEntity: 'mspp_sitesetting',
+      navigationRecordId: 'physical-setting-id',
+    }], [{
+      path: 'web-pages/contacts.js',
+      content: '<fetch><entity name="contact"><all-attributes /><order attribute="fullname" /></entity></fetch>',
+      recordEntity: 'mspp_webpage',
+      recordId: 'page-id',
+    }])
+
+    expect(findings).toEqual([expect.objectContaining({
+      table: 'contact',
+      proposedFields: ['fullname'],
+      settingName: 'Webapi/contact/fields',
+      settingValue: 'fullname,contactid',
+      settingNavigationRecordEntity: 'mspp_sitesetting',
+      settingNavigationRecordId: 'physical-setting-id',
+      wildcardPresent: false,
+      recordEntity: 'mspp_webpage',
+      recordId: 'page-id',
+    })])
   })
 
   it('blocks every proposal when a dynamic Web API table cannot be associated', () => {

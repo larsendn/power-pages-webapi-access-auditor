@@ -1,4 +1,4 @@
-import { analyzeSite, type SourceFile, type SiteSetting, type TableFinding } from './auditor'
+import { analyzeSite, findAllAttributes, type AllAttributesFinding, type SourceFile, type SiteSetting, type TableFinding } from './auditor'
 
 export type SiteModel = 'Standard' | 'Enhanced' | 'Modern'
 
@@ -46,6 +46,7 @@ export interface AnonymousPermissionFinding {
 
 export interface SiteAnalysis {
   findings: TableFinding[]
+  allAttributesFindings: AllAttributesFinding[]
   anonymousPermissionFindings: AnonymousPermissionFinding[]
   sourceCount: number
   completenessBlockers: string[]
@@ -361,5 +362,6 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
     confidence: 'blocked' as const,
     blockers: [...finding.blockers, ...completenessBlockers],
   })
-  return { findings, anonymousPermissionFindings, sourceCount: files.length, completenessBlockers }
+  const allAttributesFindings = findAllAttributes(settings, files)
+  return { findings, allAttributesFindings, anonymousPermissionFindings, sourceCount: files.length, completenessBlockers }
 }

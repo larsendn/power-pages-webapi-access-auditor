@@ -42,6 +42,22 @@ export interface TableFinding {
   blockers: string[]
 }
 
+export interface AllAttributesFinding {
+  table: string
+  file: string
+  line: number
+  proposedFields: string[]
+  recordEntity?: string
+  recordId?: string
+  settingName?: string
+  settingRecordId?: string
+  settingRecordEntity?: SiteSetting['recordEntity']
+  settingNavigationRecordEntity?: SiteSetting['navigationRecordEntity']
+  settingNavigationRecordId?: string
+  settingValue?: string
+  wildcardPresent: boolean
+}
+
 export interface EnvironmentTarget {
   id: string
   name: string
@@ -313,7 +329,34 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
     })
 }
 
-export function suggestedFetchXmlAttributes(finding: TableFinding): string {
+export function findAllAttributes(settings: SiteSetting[], files: SourceFile[]): AllAttributesFinding[] {
+  return findApiReferences(files)
+    .filter((reference) => reference.usesAllAttributes)
+    .map((reference) => {
+      const table = reference.entitySet
+      const setting = settings.find((candidate) => {
+        if (!isWebApiFieldSettingName(candidate.name)) return false
+        return entitySetCandidates(candidate.name.split('/')[1]).includes(table)
+      })
+      return {
+        table,
+        file: reference.file,
+        line: reference.line,
+        proposedFields: [...new Set(reference.fields.map((field) => field.field).filter((field) => field !== '*'))].sort(),
+        recordEntity: files.find((file) => file.path === reference.file)?.recordEntity,
+        recordId: files.find((file) => file.path === reference.file)?.recordId,
+        settingName: setting?.name,
+        settingRecordId: setting?.recordId,
+        settingRecordEntity: setting?.recordEntity,
+        settingNavigationRecordEntity: setting?.navigationRecordEntity,
+        settingNavigationRecordId: setting?.navigationRecordId,
+        settingValue: setting?.value,
+        wildcardPresent: setting ? isWildcardValue(setting.value) : false,
+      }
+    })
+}
+
+export function suggestedFetchXmlAttributes(finding: Pick<TableFinding, 'proposedFields'>): string {
   const fields = finding.proposedFields.length > 0 ? finding.proposedFields : ['required_column_logical_name']
   return fields.map((field) => `<attribute name="${field}" />`).join('\n')
 }

@@ -17,8 +17,9 @@ The identity used by the app's connections determines which environments and Pow
 
 Download the latest managed ZIP from the project's GitHub Releases page:
 
-- [PowerPagesWebApiFieldsAuditor_1_6_0_19_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.19/PowerPagesWebApiFieldsAuditor_1_6_0_19_managed.zip)
+- [PowerPagesWebApiFieldsAuditor_1_6_0_20_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.20/PowerPagesWebApiFieldsAuditor_1_6_0_20_managed.zip)
 - [All releases](https://github.com/larsendn/power-pages-webapi-access-auditor/releases)
+- [Version changelog](CHANGELOG.md)
 
 Do not extract the ZIP before importing it.
 
@@ -34,7 +35,7 @@ Do not extract the ZIP before importing it.
    - **Power Automate Management** discovers environments available to the connection identity.
 7. Complete the import and wait for it to report success.
 
-The installed solution name is **Power Pages Web API Fields Auditor**. Version `1.6.0.19` contains one code app and seven cloud flows.
+The installed solution name is **Power Pages Web API Fields Auditor**. Version `1.6.0.20` contains one code app and seven cloud flows.
 
 ## 3. Verify connections and flows
 
@@ -52,7 +53,7 @@ The connection identity must also have access in each environment selected for s
 3. To make the app available to another administrator, use **Share** and assign the appropriate app permission.
 4. Ensure each user can use the required connections and has the necessary Dataverse permissions in scan targets.
 
-The lower-left sidebar shows the running app version. Confirm it displays **Version 1.6.0.19**.
+The lower-left sidebar shows the running app version. Confirm it displays **Version 1.6.0.20**.
 
 ## 5. Run the first scan
 

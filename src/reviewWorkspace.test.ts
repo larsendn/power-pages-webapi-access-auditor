@@ -1,5 +1,37 @@
 import { describe, expect, it } from 'vitest'
-import { wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
+import { restoreUndoneFinding, wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
+
+describe('restoreUndoneFinding', () => {
+  it('moves an undone wildcard back to active findings without duplicating it', () => {
+    const updatedFinding: {
+      key: string
+      settingRecordId: string
+      currentValue: string
+      proposedValue: string
+      applyStatus?: 'applied' | 'verified' | 'failed'
+      applyMessage?: string
+    } = {
+      key: 'finding-key',
+      settingRecordId: 'setting-id',
+      currentValue: '*',
+      proposedValue: 'name,accountid',
+      applyStatus: 'verified' as const,
+      applyMessage: 'Remote value verified.',
+    }
+    const existingFinding = { ...updatedFinding, currentValue: 'stale', applyStatus: undefined, applyMessage: undefined }
+
+    const restored = restoreUndoneFinding([existingFinding], [updatedFinding], 'setting-id', '*,createdon')
+
+    expect(restored.findings).toEqual([{
+      ...updatedFinding,
+      currentValue: '*,createdon',
+      applyStatus: undefined,
+      applyMessage: undefined,
+    }])
+    expect(restored.updatedFindings).toEqual([])
+    expect(restored.restoredFinding?.key).toBe('finding-key')
+  })
+})
 
 describe('withoutNestedSiteAnalysis', () => {
   it('removes repeated analysis while preserving review data and source links', () => {
