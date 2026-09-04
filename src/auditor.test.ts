@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeSite, findAllAttributes, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, suggestedFetchXmlAttributes, type SiteSetting } from './auditor'
+import { analyzeSite, findAllAttributes, isWebApiFieldSettingName, isWildcardValue, parseAccessibleEnvironments, suggestedAllAttributesReplacement, suggestedFetchXmlAttributes, type SiteSetting } from './auditor'
 
 const wildcardSetting: SiteSetting = {
   name: 'Webapi/contact/fields',
@@ -250,6 +250,70 @@ describe('browser analyzer', () => {
       recordEntity: 'mspp_webpage',
       recordId: 'page-id',
     })])
+  })
+
+  it('reports OData $select=* with a link to the physical code record', () => {
+    const findings = findAllAttributes([wildcardSetting], [{
+      path: 'web-pages/contacts.js',
+      content: "fetch('/_api/contacts?$select=*&$filter=statecode eq 0')",
+      recordEntity: 'mspp_webpage',
+      recordId: 'page-id',
+    }])
+
+    expect(findings).toEqual([expect.objectContaining({
+      table: 'contact',
+      source: 'odata-select',
+      proposedFields: ['statecode'],
+      recordEntity: 'mspp_webpage',
+      recordId: 'page-id',
+    })])
+    expect(suggestedAllAttributesReplacement(findings[0])).toBe('$select=statecode')
+  })
+
+  it('reports supplied OData and nested FetchXML all-column patterns independently', () => {
+    const settings: SiteSetting[] = [
+      { ...wildcardSetting, name: 'Webapi/ssrs_facility/fields', recordId: 'facility-setting' },
+      { ...wildcardSetting, name: 'Webapi/ssrs_monthlyattendance/fields', recordId: 'attendance-setting' },
+      { ...wildcardSetting, name: 'Webapi/ssrs_childfamily/fields', recordId: 'family-setting' },
+    ]
+    const findings = findAllAttributes(settings, [{
+      path: 'web-pages/attendance/custom_javascript',
+      content: `
+        fetch('/_api/ssrs_facilities?$select=*')
+        const fetchXml = \`<fetch>
+          <entity name="ssrs_monthlyattendance">
+            <all-attributes />
+            <link-entity name="ssrs_childvoucher" from="ssrs_childvoucherid" to="ssrs_voucherid" alias="va">
+              <attribute name="ssrs_voucherid" />
+              <link-entity name="ssrs_childfamily" from="ssrs_childfamilyid" to="ssrs_child" alias="ch">
+                <all-attributes />
+              </link-entity>
+            </link-entity>
+          </entity>
+        </fetch>\`
+        const url = '/_api/ssrs_monthlyattendances?fetchXml=' + encodeURIComponent(fetchXml)
+      `,
+      recordEntity: 'mspp_webpage',
+      recordId: 'attendance-page',
+    }])
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'ssrs_facility', source: 'odata-select', recordEntity: 'mspp_webpage', recordId: 'attendance-page' }),
+      expect.objectContaining({ table: 'ssrs_monthlyattendance', source: 'fetchxml', recordEntity: 'mspp_webpage', recordId: 'attendance-page' }),
+      expect.objectContaining({ table: 'ssrs_childfamily', source: 'fetchxml', recordEntity: 'mspp_webpage', recordId: 'attendance-page' }),
+    ]))
+    expect(findings).toHaveLength(3)
+  })
+
+  it('blocks wildcard remediation when an OData request uses $select=*', () => {
+    const findings = analyzeSite([wildcardSetting], [{
+      path: 'web-files/contacts.js',
+      content: "const url = '/_api/contacts?$select=*'; fetch(url)",
+    }])
+
+    expect(findings[0].confidence).toBe('blocked')
+    expect(findings[0].evidence).toEqual(expect.arrayContaining([expect.objectContaining({ field: '*', source: '$select' })]))
+    expect(findings[0].blockers).toContain('An OData request uses $select=*. Replace it with an explicit $select field list, then rescan before removing the wildcard.')
   })
 
   it('blocks every proposal when a dynamic Web API table cannot be associated', () => {

@@ -13,7 +13,7 @@ The app proposes explicit field allowlists, requires review before applying chan
 
 Download the latest managed solution from [GitHub Releases](https://github.com/larsendn/power-pages-webapi-access-auditor/releases) and follow the beginner-friendly [installation and first-run guide](INSTALLATION.md).
 
-Current managed package: [PowerPagesWebApiFieldsAuditor_1_6_0_21_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.21/PowerPagesWebApiFieldsAuditor_1_6_0_21_managed.zip)
+Current managed package: [PowerPagesWebApiFieldsAuditor_1_6_0_22_managed.zip](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/download/v1.6.0.22/PowerPagesWebApiFieldsAuditor_1_6_0_22_managed.zip)
 
 See the [changelog](CHANGELOG.md) for the features and fixes included in each version.
 
@@ -33,6 +33,8 @@ The repository contains:
 Cloud flows use selected-environment Dataverse operations with runtime-derived table names. Customers install one universal solution rather than model-specific packages.
 
 Enable **Scan form web resources** before starting a selected-environment scan to include embedded HTML and JavaScript web resources from the Dataverse forms referenced by that site's basic forms and multistep form steps. The scan retrieves only referenced resources, follows direct resource references from embedded HTML, and merges evidence into the existing wildcard and all-attributes review lists. Model-driven form event libraries are excluded because their presence does not prove that Power Pages executes them.
+
+The **All attributes** review reports both FetchXML `<all-attributes />` and OData `$select=*`. It provides a copyable explicit replacement from fields that can be identified safely in the surrounding query. Treat that list as a starting point: developers must review downstream response-property reads, add dynamically consumed columns, update the customer code, and test the page before tightening its Web API field setting.
 
 ## Security Model
 
@@ -82,7 +84,7 @@ Publish the code app into its Dataverse solution, then export official managed a
 
 ```powershell
 $env:PPWFA_PRIVACY_FORBIDDEN_VALUES = "<environment-id>;<organization-url>;<organization-name>;<user-email>"
-.\scripts\build-solution-packages.ps1 -Version 1.6.0.21 -SolutionId <solution-id>
+.\scripts\build-solution-packages.ps1 -Version 1.6.0.22 -SolutionId <solution-id>
 ```
 
 The build runs tests, lint, and the production build; regenerates, packs, imports, and publishes the solution-aware flows; publishes the app with the supported `pa app push --solution-id` workflow; exports through Dataverse; and rejects archives containing configured source-environment values, organization URLs, email addresses, token signatures, or assigned secrets. Generated ZIP files are ignored; attach certified packages to a GitHub Release instead.

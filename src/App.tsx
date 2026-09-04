@@ -7,7 +7,7 @@ import {
   ArrowDownloadRegular, ArrowLeftRegular, ArrowSyncRegular, ArrowUndoRegular, ArrowUploadRegular,
   CheckmarkCircleRegular, ChevronDownRegular, ChevronRightRegular, CopyRegular, DatabaseSearchRegular, OpenRegular, SearchRegular, ShieldLockRegular, StopRegular, WarningRegular,
 } from '@fluentui/react-icons'
-import { parseAccessibleEnvironments, suggestedFetchXmlAttributes, type AllAttributesFinding, type EnvironmentTarget, type TableFinding } from './auditor'
+import { parseAccessibleEnvironments, suggestedAllAttributesReplacement, type AllAttributesFinding, type EnvironmentTarget, type TableFinding } from './auditor'
 import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type ChangeHistoryRecord } from './changeHistory'
 import { flowErrorMessage } from './errorMessage'
 import { flowGateway } from './flowGateway'
@@ -17,6 +17,7 @@ import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isAc
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
 import { restoreUndoneFinding, wildcardFindingKey, withoutComponentEvidenceLinks, withoutNestedSiteAnalysis } from './reviewWorkspace'
+import { physicalRecordUrl } from './recordNavigation'
 import { analyzeConfiguration, isCodeWebFile, parseRows, portalFormReferences, siteModelLabel, type AnonymousPermissionFinding, type RetrievedCodeFile, type SiteAnalysis, type SiteConfigurationPayload, type SiteModel } from './siteConfiguration'
 import powerPagesLogo from './assets/power-pages-logo.png'
 import './App.css'
@@ -162,14 +163,11 @@ function errorMessage(error: unknown): string {
 }
 
 function recordUrl(site: PowerPagesSite, entity: string, recordId: string): string {
-  const environmentUrl = site.environment.url.replace(/\/$/, '')
-  if (!environmentUrl) return ''
-  return `${environmentUrl}/main.aspx?pagetype=entityrecord&etn=${encodeURIComponent(entity)}&id=${encodeURIComponent(recordId)}`
+  return physicalRecordUrl(site.environment.url, entity, recordId)
 }
 
 function codeRecordUrl(site: PowerPagesSite, entity?: string, recordId?: string): string {
-  if (!entity || !recordId || entity === 'powerpagecomponent') return ''
-  return recordUrl(site, entity, recordId)
+  return physicalRecordUrl(site.environment.url, entity, recordId)
 }
 
 function siteSettingRecordUrl(site: PowerPagesSite, finding: TableFinding): string {
@@ -187,16 +185,24 @@ function allAttributesSettingRecordUrl(site: PowerPagesSite, finding: AllAttribu
   return recordUrl(site, finding.settingRecordEntity, finding.settingRecordId)
 }
 
-function requiresFetchXmlChange(finding: TableFinding): boolean {
-  return finding.blockers.some((blocker) => blocker.startsWith('FetchXML uses <all-attributes />'))
+function requiresCodeChange(finding: TableFinding): boolean {
+  return finding.blockers.some((blocker) => blocker.startsWith('FetchXML uses <all-attributes />') || blocker.startsWith('An OData request uses $select=*'))
+}
+
+function allAttributesSource(finding: TableFinding): AllAttributesFinding['source'] {
+  return finding.blockers.some((blocker) => blocker.startsWith('An OData request uses $select=*')) ? 'odata-select' : 'fetchxml'
+}
+
+function allAttributesLabel(source: AllAttributesFinding['source']): string {
+  return source === 'odata-select' ? '$select=*' : '<all-attributes />'
 }
 
 function requiresFieldReview(finding: TableFinding): boolean {
-  return finding.confidence === 'blocked' && !requiresFetchXmlChange(finding)
+  return finding.confidence === 'blocked' && !requiresCodeChange(finding)
 }
 
 function canSelectFinding(finding: TableFinding, manualValue: string): boolean {
-  if (requiresFetchXmlChange(finding)) return false
+  if (requiresCodeChange(finding)) return false
   if (requiresFieldReview(finding)) return Boolean(normalizeExplicitFields(manualValue))
   return true
 }
@@ -411,7 +417,7 @@ function App() {
     return [...groups.values()]
   }, [allAttributesFindings])
   const approvalValue = (finding: FindingEntry) => {
-    if (requiresFetchXmlChange(finding)) return ''
+    if (requiresCodeChange(finding)) return ''
     const manualValue = normalizeExplicitFields(manualValues[finding.key] ?? '')
     if (requiresFieldReview(finding)) return manualValue
     return manualValue || normalizeExplicitFields(finding.proposedValue) || minimumExplicitFields(finding.table)
@@ -1123,7 +1129,7 @@ function App() {
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
                           <Checkbox checked={approved.has(finding.key)} disabled={applying || !selectableFinding(finding)} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
                           <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}{group.findings.filter((candidate) => candidate.settingName.toLowerCase() === finding.settingName.toLowerCase()).length > 1 ? ' · duplicate setting record' : ''}</small></span>
-                          <Badge appearance="tint" color={requiresFetchXmlChange(finding) ? 'danger' : requiresFieldReview(finding) ? 'warning' : 'brand'}>{requiresFetchXmlChange(finding) ? 'code change required' : requiresFieldReview(finding) ? 'field review required' : 'ready to update'}</Badge>
+                          <Badge appearance="tint" color={requiresCodeChange(finding) ? 'danger' : requiresFieldReview(finding) ? 'warning' : 'brand'}>{requiresCodeChange(finding) ? 'code change required' : requiresFieldReview(finding) ? 'field review required' : 'ready to update'}</Badge>
                         </button>
                       ))}</div>
                     </section>})}
@@ -1149,13 +1155,13 @@ function App() {
                         <div className="wildcard-site-heading">
                           <div className="wildcard-site-heading-main">
                             <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
-                            <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{siteModelLabel(group.site.model)}</Badge></strong><span>{group.site.environment.name} · {group.findings.length} all-attributes quer{group.findings.length === 1 ? 'y' : 'ies'}</span></div>
+                            <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{siteModelLabel(group.site.model)}</Badge></strong><span>{group.site.environment.name} · {group.findings.length} all-column quer{group.findings.length === 1 ? 'y' : 'ies'}</span></div>
                           </div>
                         </div>
                         <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                           <button className={`finding-row ${selectedAllAttributesFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedAllAttributesFindingKey(finding.key)}>
                             <WarningRegular className="finding-icon" />
-                            <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.file}:{finding.line}</small></span>
+                            <span className="finding-copy"><strong>{finding.table}</strong><small>{allAttributesLabel(finding.source)} · {finding.file}:{finding.line}</small></span>
                             <Badge appearance="tint" color={finding.wildcardPresent ? 'danger' : 'warning'}>{finding.wildcardPresent ? 'wildcard also present' : finding.settingName ? 'setting is explicit' : 'setting not found'}</Badge>
                           </button>
                         ))}</div>
@@ -1163,7 +1169,7 @@ function App() {
                     })}
                   </div>
                 ) : (
-                  <div className="empty-state"><CheckmarkCircleRegular /><h3>No all-attributes queries found</h3><p>No scanned FetchXML query uses <code>&lt;all-attributes /&gt;</code>.</p></div>
+                  <div className="empty-state"><CheckmarkCircleRegular /><h3>No all-column queries found</h3><p>No scanned request uses <code>&lt;all-attributes /&gt;</code> or <code>$select=*</code>.</p></div>
                 ))}
                 {reviewView === 'anonymous' && (anonymousFindings.length > 0 ? (
                   <div className="wildcard-site-groups">
@@ -1196,9 +1202,9 @@ function App() {
                   <>
                     <span className="step-label">CODE EVIDENCE</span><h2>{selectedFinding.settingName}</h2><p>{selectedFinding.site.environment.name} / {selectedFinding.site.name}</p>
                     {siteSettingRecordUrl(selectedFinding.site, selectedFinding) && <Button as="a" href={siteSettingRecordUrl(selectedFinding.site, selectedFinding)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
-                    <dl><dt>Current value</dt><dd><code>{selectedFinding.currentValue}</code></dd><dt>Explicit replacement</dt><dd><code>{requiresFetchXmlChange(selectedFinding) ? 'Change FetchXML and rescan' : approvalValue(selectedFinding) || 'Enter reviewed fields below'}</code></dd></dl>
-                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields{requiresFieldReview(selectedFinding) ? ' (required)' : ' (optional override)'}</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={requiresFieldReview(selectedFinding) ? 'dmh_name,dmh_sschoolsid' : approvalValue(selectedFinding)} disabled={applying || requiresFetchXmlChange(selectedFinding)} /><small>{requiresFetchXmlChange(selectedFinding) ? 'Automatic remediation is disabled until every all-attributes query is replaced and the site is rescanned.' : requiresFieldReview(selectedFinding) ? 'This request returns the whole response object without naming its consumed fields. Review its callers and enter every logical column they read before selecting the update.' : 'Enter additional logical column names when the detected list needs adjustment.'}</small></div>
-                    {selectedFinding.blockers.length > 0 && (requiresFetchXmlChange(selectedFinding) ? <><div className="blocker-panel"><strong>Code change required</strong><p>This FetchXML query uses <code>&lt;all-attributes /&gt;</code>, which Power Pages sends as attribute <code>*</code>. Replace it with explicit <code>&lt;attribute name="..." /&gt;</code> elements, then rescan before removing the wildcard.</p></div><div className="code-suggestion"><div><strong>Suggested FetchXML replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedFetchXmlAttributes(selectedFinding))}>Copy suggestion</Button></div><pre><code>{suggestedFetchXmlAttributes(selectedFinding)}</code></pre><p>This is a starting point based on columns detected in this entity's attributes, filters, and ordering. Add every column read by page rendering or business logic before rescanning. The auditor does not update customer code.</p></div></> : <div className="blocker-panel"><strong>Field review required</strong><p>The request has no <code>$select</code> and returns the whole response object to its caller, so the auditor cannot safely determine which columns are consumed. Enter a reviewed explicit field list above; automatic primary-ID fallback is disabled.</p></div>)}
+                    <dl><dt>Current value</dt><dd><code>{selectedFinding.currentValue}</code></dd><dt>Explicit replacement</dt><dd><code>{requiresCodeChange(selectedFinding) ? 'Change the all-column query and rescan' : approvalValue(selectedFinding) || 'Enter reviewed fields below'}</code></dd></dl>
+                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields{requiresFieldReview(selectedFinding) ? ' (required)' : ' (optional override)'}</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={requiresFieldReview(selectedFinding) ? 'dmh_name,dmh_sschoolsid' : approvalValue(selectedFinding)} disabled={applying || requiresCodeChange(selectedFinding)} /><small>{requiresCodeChange(selectedFinding) ? 'Automatic remediation is disabled until every all-column query is replaced and the site is rescanned.' : requiresFieldReview(selectedFinding) ? 'This request returns the whole response object without naming its consumed fields. Review its callers and enter every logical column they read before selecting the update.' : 'Enter additional logical column names when the detected list needs adjustment.'}</small></div>
+                    {selectedFinding.blockers.length > 0 && (requiresCodeChange(selectedFinding) ? <><div className="blocker-panel"><strong>Code change required</strong><p>This request uses <code>{allAttributesLabel(allAttributesSource(selectedFinding))}</code> to request every column. Replace it with an explicit field list, then rescan before removing the wildcard.</p></div><div className="code-suggestion"><div><strong>Suggested code replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedAllAttributesReplacement({ proposedFields: selectedFinding.proposedFields, source: allAttributesSource(selectedFinding) }))}>Copy suggestion</Button></div><pre><code>{suggestedAllAttributesReplacement({ proposedFields: selectedFinding.proposedFields, source: allAttributesSource(selectedFinding) })}</code></pre><p>This is a starting point based on columns detected in the request. Add every column read by page rendering or business logic before rescanning. The auditor does not update customer code.</p></div></> : <div className="blocker-panel"><strong>Field review required</strong><p>The request has no <code>$select</code> and returns the whole response object to its caller, so the auditor cannot safely determine which columns are consumed. Enter a reviewed explicit field list above; automatic primary-ID fallback is disabled.</p></div>)}
                     <h3>References ({selectedFinding.evidence.length})</h3>
                     <div className="evidence-list">{selectedFinding.evidence.map((evidence, index) => {
                       const sourceUrl = codeRecordUrl(selectedFinding.site, evidence.recordEntity, evidence.recordId)
@@ -1221,7 +1227,7 @@ function App() {
                   </>
                 ) : reviewView === 'allAttributes' && selectedAllAttributesFinding ? (
                   <>
-                    <span className="step-label">FETCHXML CODE EVIDENCE</span><h2>{selectedAllAttributesFinding.table}</h2><p>{selectedAllAttributesFinding.site.environment.name} / {selectedAllAttributesFinding.site.name}</p>
+                    <span className="step-label">ALL-COLUMN CODE EVIDENCE</span><h2>{selectedAllAttributesFinding.table}</h2><p>{selectedAllAttributesFinding.site.environment.name} / {selectedAllAttributesFinding.site.name}</p>
                     {codeRecordUrl(selectedAllAttributesFinding.site, selectedAllAttributesFinding.recordEntity, selectedAllAttributesFinding.recordId) && <Button as="a" href={codeRecordUrl(selectedAllAttributesFinding.site, selectedAllAttributesFinding.recordEntity, selectedAllAttributesFinding.recordId)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open source record</Button>}
                     {allAttributesSettingRecordUrl(selectedAllAttributesFinding.site, selectedAllAttributesFinding) && <Button as="a" href={allAttributesSettingRecordUrl(selectedAllAttributesFinding.site, selectedAllAttributesFinding)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
                     <dl>
@@ -1229,8 +1235,8 @@ function App() {
                       <dt>Matched setting</dt><dd><code>{selectedAllAttributesFinding.settingName ?? 'No matching Web API fields setting found'}</code></dd>
                       <dt>Current setting value</dt><dd><code>{selectedAllAttributesFinding.settingValue ?? 'Not available'}</code></dd>
                     </dl>
-                    <MessageBar intent="warning"><MessageBarBody>This FetchXML query still requests every column with <code>&lt;all-attributes /&gt;</code>{selectedAllAttributesFinding.wildcardPresent ? ', and its matching Web API field setting also contains a wildcard.' : '. It remains a code issue even though the matching Web API field setting is no longer a wildcard.'}</MessageBarBody></MessageBar>
-                    <div className="code-suggestion"><div><strong>Suggested FetchXML replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedFetchXmlAttributes(selectedAllAttributesFinding))}>Copy suggestion</Button></div><pre><code>{suggestedFetchXmlAttributes(selectedAllAttributesFinding)}</code></pre><p>This is a starting point based on attributes used by this query. Add every column consumed by page rendering or business logic. The auditor does not update customer code.</p></div>
+                    <MessageBar intent="warning"><MessageBarBody>This query still requests every column with <code>{allAttributesLabel(selectedAllAttributesFinding.source)}</code>{selectedAllAttributesFinding.wildcardPresent ? ', and its matching Web API field setting also contains a wildcard.' : '. It remains a code issue even though the matching Web API field setting is no longer a wildcard.'}</MessageBarBody></MessageBar>
+                    <div className="code-suggestion"><div><strong>Suggested code replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedAllAttributesReplacement(selectedAllAttributesFinding))}>Copy suggestion</Button></div><pre><code>{suggestedAllAttributesReplacement(selectedAllAttributesFinding)}</code></pre><p>This is a starting point based on columns used by this query. Add every column consumed by page rendering or business logic. The auditor does not update customer code.</p></div>
                   </>
                 ) : reviewView === 'anonymous' && selectedAnonymousFinding ? (
                   <>

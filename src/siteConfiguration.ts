@@ -113,6 +113,22 @@ function enhancedCodeRecord(
       { payloadKey: 'standardwebfilesjson', entity: 'adx_webfile', id: 'adx_webfileid', names: ['adx_partialurl', 'adx_name'] },
       { payloadKey: 'modernwebfilesjson', entity: 'mspp_webfile', id: 'mspp_webfileid', names: ['mspp_partialurl', 'mspp_name'] },
     ],
+    7: [
+      { payloadKey: 'standardcontentsnippetsjson', entity: 'adx_contentsnippet', id: 'adx_contentsnippetid', names: ['adx_name'] },
+      { payloadKey: 'moderncontentsnippetsjson', entity: 'mspp_contentsnippet', id: 'mspp_contentsnippetid', names: ['mspp_name'] },
+    ],
+    8: [
+      { payloadKey: 'standardwebtemplatesjson', entity: 'adx_webtemplate', id: 'adx_webtemplateid', names: ['adx_name'] },
+      { payloadKey: 'modernwebtemplatesjson', entity: 'mspp_webtemplate', id: 'mspp_webtemplateid', names: ['mspp_name'] },
+    ],
+    15: [
+      { payloadKey: 'standardbasicformsjson', entity: 'adx_entityform', id: 'adx_entityformid', names: ['adx_name'] },
+      { payloadKey: 'modernbasicformsjson', entity: 'mspp_entityform', id: 'mspp_entityformid', names: ['mspp_name'] },
+    ],
+    20: [
+      { payloadKey: 'standardmultistepformstepsjson', entity: 'adx_webformstep', id: 'adx_webformstepid', names: ['adx_name'] },
+      { payloadKey: 'modernmultistepformstepsjson', entity: 'mspp_webformstep', id: 'mspp_webformstepid', names: ['mspp_name'] },
+    ],
   }
   const idHints = new Set(Object.entries(content)
     .filter(([key, value]) => key.toLowerCase().endsWith('id') && typeof value === 'string')
@@ -308,13 +324,18 @@ export function analyzeConfiguration(model: SiteModel, payload: SiteConfiguratio
   const componentPermissionFindings = model === 'Enhanced' || model === 'Modern'
     ? enhancedAnonymousPermissions(parseRows(payload.enhancedcomponentsjson))
     : []
-  const modernPermissionIds = new Set(parseRows(payload.modernpermissionsjson)
-    .map((row) => text(row.mspp_entitypermissionid).toLowerCase())
-    .filter(Boolean))
+  const modernPermissionRows = parseRows(payload.modernpermissionsjson)
   const navigableComponentPermissionFindings = model === 'Modern' || model === 'Enhanced'
-    ? componentPermissionFindings.map((finding): AnonymousPermissionFinding => modernPermissionIds.has(finding.permissionRecordId.toLowerCase())
-      ? { ...finding, permissionRecordEntity: 'mspp_entitypermission' }
-      : finding)
+    ? componentPermissionFindings.map((finding): AnonymousPermissionFinding => {
+      const idMatches = modernPermissionRows.filter((row) => text(row.mspp_entitypermissionid).toLowerCase() === finding.permissionRecordId.toLowerCase())
+      const matches = idMatches.length > 0 ? idMatches : modernPermissionRows.filter((row) => (
+        text(row.mspp_entityname).toLowerCase() === finding.permissionName.toLowerCase()
+        && text(row.mspp_entitylogicalname).toLowerCase() === finding.table.toLowerCase()
+      ))
+      return matches.length === 1
+        ? { ...finding, permissionRecordId: text(matches[0].mspp_entitypermissionid), permissionRecordEntity: 'mspp_entitypermission' }
+        : finding
+    })
     : componentPermissionFindings
   const recordPermissionFindings = model === 'Standard' || model === 'Modern'
     ? standardAnonymousPermissions(

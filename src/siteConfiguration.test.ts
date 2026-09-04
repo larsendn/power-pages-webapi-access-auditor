@@ -87,6 +87,21 @@ describe('site configuration analysis', () => {
     expect(result.findings[0].proposedFields).toEqual(['firstname'])
   })
 
+  it('links Enhanced snippet evidence to its physical record', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'setting-1', powerpagecomponenttype: 9, name: 'fields', content: JSON.stringify({ name: 'Webapi/contact/fields', value: '*' }) },
+        { powerpagecomponentid: 'snippet-1', powerpagecomponenttype: 7, name: 'Contact script', content: JSON.stringify({ value: "fetch('/_api/contacts?$select=firstname')" }) },
+      ]),
+      moderncontentsnippetsjson: JSON.stringify([{ mspp_contentsnippetid: 'physical-snippet-1', mspp_name: 'Contact script' }]),
+    })
+
+    expect(result.findings[0].evidence[0]).toEqual(expect.objectContaining({
+      recordEntity: 'mspp_contentsnippet',
+      recordId: 'physical-snippet-1',
+    }))
+  })
+
   it('blocks enhanced remediation when web-file bytes were not scanned', () => {
     const result = analyzeConfiguration('Enhanced', {
       enhancedcomponentsjson: JSON.stringify([
@@ -379,6 +394,37 @@ describe('site configuration analysis', () => {
       permissionRecordId: 'permission-1',
       permissionRecordEntity: 'mspp_entitypermission',
     })])
+  })
+
+  it('resolves an Enhanced permission by unique name and table when physical IDs differ', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'anonymous-role', powerpagecomponenttype: 11, name: 'Anonymous Users', content: JSON.stringify({ anonymoususersrole: true }) },
+        { powerpagecomponentid: 'component-permission', powerpagecomponenttype: 18, name: 'Contact (Global)', content: JSON.stringify({ entityname: 'Contact (Global)', entitylogicalname: 'contact', scope: 756150000, read: true, adx_entitypermission_webrole: ['anonymous-role'] }) },
+      ]),
+      modernpermissionsjson: JSON.stringify([
+        { mspp_entitypermissionid: 'physical-permission', mspp_entityname: 'Contact (Global)', mspp_entitylogicalname: 'contact' },
+      ]),
+    })
+
+    expect(result.anonymousPermissionFindings).toEqual([expect.objectContaining({
+      permissionRecordId: 'physical-permission',
+      permissionRecordEntity: 'mspp_entitypermission',
+    })])
+  })
+
+  it('keeps an unresolved Enhanced permission non-physical so navigation can hide it', () => {
+    const result = analyzeConfiguration('Enhanced', {
+      enhancedcomponentsjson: JSON.stringify([
+        { powerpagecomponentid: 'anonymous-role', powerpagecomponenttype: 11, name: 'Anonymous Users', content: JSON.stringify({ anonymoususersrole: true }) },
+        { powerpagecomponentid: 'component-permission', powerpagecomponenttype: 18, name: 'Contact (Global)', content: JSON.stringify({ entityname: 'Contact (Global)', entitylogicalname: 'contact', scope: 756150000, read: true, adx_entitypermission_webrole: ['anonymous-role'] }) },
+      ]),
+    })
+
+    expect(result.anonymousPermissionFindings[0]).toEqual(expect.objectContaining({
+      permissionRecordId: 'component-permission',
+      permissionRecordEntity: 'powerpagecomponent',
+    }))
   })
 
   it('uses Enhanced security components for a Modern site when its N:N rows are empty', () => {

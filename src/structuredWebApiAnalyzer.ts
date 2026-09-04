@@ -14,6 +14,8 @@ export interface StructuredApiReference {
   line: number
   fields: StructuredApiField[]
   hasStaticQuery: boolean
+  usesAllAttributes?: boolean
+  allAttributesSource?: 'fetchxml' | 'odata-select'
   unresolvedReason?: string
 }
 
@@ -247,7 +249,7 @@ function queryFields(key: string, value: string): StructuredApiField[] {
     confidence = 'medium'
   }
   return fields
-    .filter((field) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(field))
+    .filter((field) => field === '*' || /^[A-Za-z_][A-Za-z0-9_]*$/.test(field))
     .map((field) => ({ field, source: key as StructuredEvidenceSource, confidence }))
 }
 
@@ -309,6 +311,8 @@ function referenceFromRequest(
     line,
     fields: [...queryEvidence, ...payloadEvidence],
     hasStaticQuery: (Boolean(query) && queryIsComplete && queryEvidence.length > 0) || (payload.complete && payloadEvidence.length > 0),
+    usesAllAttributes: queryEvidence.some((field) => field.source === '$select' && field.field === '*'),
+    allAttributesSource: queryEvidence.some((field) => field.source === '$select' && field.field === '*') ? 'odata-select' : undefined,
   }
 }
 

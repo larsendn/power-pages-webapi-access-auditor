@@ -56,6 +56,7 @@ export interface AllAttributesFinding {
   settingNavigationRecordId?: string
   settingValue?: string
   wildcardPresent: boolean
+  source: 'fetchxml' | 'odata-select'
 }
 
 export interface EnvironmentTarget {
@@ -77,6 +78,7 @@ interface ApiReference {
   fields: Omit<FieldEvidence, 'file' | 'line'>[]
   hasStaticQuery: boolean
   usesAllAttributes?: boolean
+  allAttributesSource?: 'fetchxml' | 'odata-select'
 }
 
 const QUERY_KEYS = new Set(['$select', '$filter', '$orderby', '$expand'])
@@ -191,7 +193,7 @@ function fieldsForParameter(key: string, value: string): Omit<FieldEvidence, 'fi
   }
 
   return fields
-    .filter((field) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(field))
+    .filter((field) => field === '*' || /^[A-Za-z_][A-Za-z0-9_]*$/.test(field))
     .map((field) => ({ field, source: key as FieldEvidence['source'], confidence }))
 }
 
@@ -242,6 +244,7 @@ function fetchXmlReferences(source: string, file: string): ApiReference[] {
     if (!current) continue
     if (/^<all-attributes\b/i.test(tag)) {
       current.usesAllAttributes = true
+      current.allAttributesSource = 'fetchxml'
       current.hasStaticQuery = true
       current.fields.push({ field: '*', source: 'fetchxml', confidence: 'high' })
       continue
@@ -272,12 +275,16 @@ function findApiReferences(files: SourceFile[]): ApiReference[] {
       const payload = payloadFields(file.content.slice(match.index, match.index + 2000))
       const line = file.content.slice(0, match.index).split(/\r?\n/).length
       if (structuredKeys.has(`${line}|${match[1].toLowerCase()}`)) continue
+      const fields = [...parseQuery(query), ...payload]
+      const usesSelectWildcard = fields.some((field) => field.source === '$select' && field.field === '*')
       references.push({
         entitySet: match[1],
         file: file.path,
         line,
-        fields: [...parseQuery(query), ...payload],
+        fields,
         hasStaticQuery: (query.length > 0 && !/\$\{|[{}]/.test(query)) || payload.length > 0,
+        usesAllAttributes: usesSelectWildcard,
+        allAttributesSource: usesSelectWildcard ? 'odata-select' : undefined,
       })
     }
     references.push(...fetchXmlReferences(file.content, file.path))
@@ -308,13 +315,18 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
         blockers.push('At least one request has no fully static query; its returned fields cannot be inferred safely.')
       }
       if (matches.some((reference) => reference.usesAllAttributes)) {
-        blockers.push('FetchXML uses <all-attributes />. Replace it with explicit <attribute name="..." /> elements, then rescan before removing the wildcard.')
+        if (matches.some((reference) => reference.allAttributesSource === 'fetchxml')) {
+          blockers.push('FetchXML uses <all-attributes />. Replace it with explicit <attribute name="..." /> elements, then rescan before removing the wildcard.')
+        }
+        if (matches.some((reference) => reference.allAttributesSource === 'odata-select')) {
+          blockers.push('An OData request uses $select=*. Replace it with an explicit $select field list, then rescan before removing the wildcard.')
+        }
       }
       if (unresolvedReferences.length > 0) blockers.push(`${unresolvedReferences.length} Web API request${unresolvedReferences.length === 1 ? ' uses' : 's use'} a dynamic table name and could not be associated with a field setting.`)
       if (proposedFields.length === 0) blockers.push('No fields were inferred from static OData query options.')
 
       return {
-        table,
+        table: setting?.name.split('/')[1] ?? table,
         settingName: setting.name,
         settingRecordId: setting.recordId,
         settingRecordEntity: setting.recordEntity,
@@ -339,7 +351,7 @@ export function findAllAttributes(settings: SiteSetting[], files: SourceFile[]):
         return entitySetCandidates(candidate.name.split('/')[1]).includes(table)
       })
       return {
-        table,
+        table: setting?.name.split('/')[1] ?? table,
         file: reference.file,
         line: reference.line,
         proposedFields: [...new Set(reference.fields.map((field) => field.field).filter((field) => field !== '*'))].sort(),
@@ -352,6 +364,7 @@ export function findAllAttributes(settings: SiteSetting[], files: SourceFile[]):
         settingNavigationRecordId: setting?.navigationRecordId,
         settingValue: setting?.value,
         wildcardPresent: setting ? isWildcardValue(setting.value) : false,
+        source: reference.allAttributesSource ?? 'fetchxml',
       }
     })
 }
@@ -359,4 +372,11 @@ export function findAllAttributes(settings: SiteSetting[], files: SourceFile[]):
 export function suggestedFetchXmlAttributes(finding: Pick<TableFinding, 'proposedFields'>): string {
   const fields = finding.proposedFields.length > 0 ? finding.proposedFields : ['required_column_logical_name']
   return fields.map((field) => `<attribute name="${field}" />`).join('\n')
+}
+
+export function suggestedAllAttributesReplacement(finding: Pick<AllAttributesFinding, 'proposedFields' | 'source'>): string {
+  const fields = finding.proposedFields.length > 0 ? finding.proposedFields : ['required_column_logical_name']
+  return finding.source === 'odata-select'
+    ? `$select=${fields.join(',')}`
+    : fields.map((field) => `<attribute name="${field}" />`).join('\n')
 }
