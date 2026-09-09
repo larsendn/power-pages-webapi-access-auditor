@@ -12,7 +12,7 @@ import { changeHistoryToCsv, mergeChangeHistory, parseChangeHistoryCsv, type Cha
 import { flowErrorMessage } from './errorMessage'
 import { flowGateway } from './flowGateway'
 import { embeddedFormWebResourceNames, referencedHtmlWebResourceNames } from './formWebResources'
-import { canApplyReviewedFields, minimumExplicitFields, normalizeExplicitFields } from './approval'
+import { minimumExplicitFields, resolveExplicitFields } from './approval'
 import { claimUniqueSites, getSiteDiscoveryDiagnostics, hasPowerPagesSites, isActiveSiteRecord, matchesEnvironmentList, parseEnvironmentList, siteDiscoveryFailure } from './environmentFilters'
 import { runBoundedPool, withTransientRetry } from './detectionScheduler'
 import { debugLogger } from './debugLogger'
@@ -199,10 +199,6 @@ function allAttributesLabel(source: AllAttributesFinding['source']): string {
 
 function requiresFieldReview(finding: TableFinding): boolean {
   return finding.confidence === 'blocked'
-}
-
-function canSelectFinding(finding: TableFinding, manualValue: string): boolean {
-  return canApplyReviewedFields(finding.confidence, manualValue)
 }
 
 function decodeBase64(value: string): string {
@@ -415,11 +411,8 @@ function App() {
     return [...groups.values()]
   }, [allAttributesFindings])
   const approvalValue = (finding: FindingEntry) => {
-    const manualValue = normalizeExplicitFields(manualValues[finding.key] ?? '')
-    if (requiresFieldReview(finding)) return manualValue
-    return manualValue || normalizeExplicitFields(finding.proposedValue) || minimumExplicitFields(finding.table)
+    return resolveExplicitFields(finding.confidence, requiresCodeChange(finding), manualValues[finding.key] ?? '', finding.proposedValue, finding.table)
   }
-  const selectableFinding = (finding: FindingEntry) => canSelectFinding(finding, manualValues[finding.key] ?? '')
   const readyCount = findings.filter((finding) => approvalValue(finding)).length
   const selectedFieldsRequiredCount = findings.filter((finding) => approved.has(finding.key) && !approvalValue(finding)).length
   const failedSiteCount = sites.filter((site) => site.error).length
@@ -879,7 +872,7 @@ function App() {
     setApproved((current) => {
       const next = new Set(current)
       for (const entry of entries) {
-        if (checked && selectableFinding(entry)) next.add(entry.key)
+        if (checked) next.add(entry.key)
         else next.delete(entry.key)
       }
       return next
@@ -887,9 +880,8 @@ function App() {
   }
 
   function approvalSelectionState(entries: FindingEntry[]): boolean | 'mixed' {
-    const eligible = entries.filter(selectableFinding)
-    const selected = eligible.filter((entry) => approved.has(entry.key)).length
-    return selected === 0 ? false : selected === eligible.length ? true : 'mixed'
+    const selected = entries.filter((entry) => approved.has(entry.key)).length
+    return selected === 0 ? false : selected === entries.length ? true : 'mixed'
   }
 
   function updateManualValue(finding: FindingEntry, value: string) {
@@ -1108,7 +1100,7 @@ function App() {
                 {reviewView === 'wildcards' && (findings.length > 0 ? <>
                   <div className="wildcard-selection-toolbar">
                     <div><strong>Select wildcard changes</strong><span>Select every result, then clear individual sites or settings that should not be updated.</span></div>
-                    <Checkbox label={`Select all results (${findings.filter(selectableFinding).length})`} checked={approvalSelectionState(findings)} disabled={applying || findings.every((finding) => !selectableFinding(finding))} onChange={(_, data) => toggleApprovals(findings, data.checked === true)} />
+                    <Checkbox label={`Select all results (${findings.length})`} checked={approvalSelectionState(findings)} disabled={applying || findings.length === 0} onChange={(_, data) => toggleApprovals(findings, data.checked === true)} />
                   </div>
                   <div className="wildcard-site-groups">
                     {wildcardSiteGroups.map((group) => {
@@ -1120,11 +1112,11 @@ function App() {
                           <Button appearance="subtle" size="small" icon={collapsed ? <ChevronRightRegular /> : <ChevronDownRegular />} aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.site.name}`} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => toggleSiteGroup(group.key)} />
                           <div><strong>{group.site.name} <Badge appearance="tint" color="informative">{siteModelLabel(group.site.model)}</Badge></strong><span>{group.site.environment.name} · {siteModelLabel(group.site.model)} · {group.findings.length} wildcard setting{group.findings.length === 1 ? '' : 's'}</span></div>
                         </div>
-                        <Checkbox label={`Select all for ${group.site.name} (${siteModelLabel(group.site.model)})`} checked={approvalSelectionState(group.findings)} disabled={applying || group.findings.every((finding) => !selectableFinding(finding))} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
+                        <Checkbox label={`Select all for ${group.site.name} (${siteModelLabel(group.site.model)})`} checked={approvalSelectionState(group.findings)} disabled={applying} onChange={(_, data) => toggleApprovals(group.findings, data.checked === true)} />
                       </div>
                       <div id={contentId} hidden={collapsed}>{group.findings.map((finding) => (
                         <button className={`finding-row ${selectedFindingKey === finding.key ? 'selected' : ''}`} key={finding.key} onClick={() => setSelectedFindingKey(finding.key)}>
-                          <Checkbox checked={approved.has(finding.key)} disabled={applying || !selectableFinding(finding)} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
+                          <Checkbox checked={approved.has(finding.key)} disabled={applying} onChange={(_, data) => toggleApproval(finding, data.checked === true)} onClick={(event) => event.stopPropagation()} aria-label={`Select ${finding.settingName} for update`} />
                           <span className="finding-copy"><strong>{finding.table}</strong><small>{finding.settingName}{group.findings.filter((candidate) => candidate.settingName.toLowerCase() === finding.settingName.toLowerCase()).length > 1 ? ' · duplicate setting record' : ''}</small></span>
                           <Badge appearance="tint" color={requiresCodeChange(finding) ? 'danger' : requiresFieldReview(finding) ? 'warning' : 'brand'}>{requiresCodeChange(finding) ? 'review fields + update code' : requiresFieldReview(finding) ? 'field review required' : 'ready to update'}</Badge>
                         </button>
@@ -1200,7 +1192,7 @@ function App() {
                     <span className="step-label">CODE EVIDENCE</span><h2>{selectedFinding.settingName}</h2><p>{selectedFinding.site.environment.name} / {selectedFinding.site.name}</p>
                     {siteSettingRecordUrl(selectedFinding.site, selectedFinding) && <Button as="a" href={siteSettingRecordUrl(selectedFinding.site, selectedFinding)} target="_blank" rel="noreferrer" appearance="outline" className="record-link">Open site setting record</Button>}
                     <dl><dt>Current value</dt><dd><code>{selectedFinding.currentValue}</code></dd><dt>Explicit replacement</dt><dd><code>{approvalValue(selectedFinding) || 'Enter reviewed fields below'}</code></dd></dl>
-                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields{requiresFieldReview(selectedFinding) ? ' (required)' : ' (optional override)'}</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={selectedFinding.proposedFields.join(',') || 'dmh_name,dmh_sschoolsid'} disabled={applying} /><small>{requiresCodeChange(selectedFinding) ? 'Review the suggested candidates, add every field consumed by the page, and enter the complete list here. The setting can be updated now; customer code remains unchanged and must be fixed separately.' : requiresFieldReview(selectedFinding) ? 'This request returns the whole response object without naming its consumed fields. Review its callers and enter every logical column they read before selecting the update.' : 'Enter additional logical column names when the detected list needs adjustment.'}</small></div>
+                    <div className="manual-fields"><label htmlFor="manual-fields">Reviewed explicit fields{requiresFieldReview(selectedFinding) && !requiresCodeChange(selectedFinding) ? ' (required)' : ' (optional override)'}</label><Input id="manual-fields" value={manualValues[selectedFinding.key] ?? ''} onChange={(event) => updateManualValue(selectedFinding, event.currentTarget.value)} placeholder={selectedFinding.proposedFields.join(',') || 'dmh_name,dmh_sschoolsid'} disabled={applying} /><small>{requiresCodeChange(selectedFinding) ? 'The detected explicit field list is ready to apply. Enter an override only when fields need to be added or removed. Customer code remains unchanged and must be fixed separately.' : requiresFieldReview(selectedFinding) ? 'This request returns the whole response object without naming its consumed fields. Review its callers and enter every logical column they read before applying the update.' : 'Enter additional logical column names when the detected list needs adjustment.'}</small></div>
                     {selectedFinding.blockers.length > 0 && (requiresCodeChange(selectedFinding) ? <><div className="blocker-panel"><strong>Separate code change required</strong><p>This request uses <code>{allAttributesLabel(allAttributesSource(selectedFinding))}</code> to request every column. You can apply the reviewed site-setting list above now. The auditor will not modify customer code; developers must replace the all-column query and test it separately.</p></div><div className="code-suggestion"><div><strong>Suggested code replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedAllAttributesReplacement({ proposedFields: selectedFinding.proposedFields, source: allAttributesSource(selectedFinding) }))}>Copy suggestion</Button></div><pre><code>{suggestedAllAttributesReplacement({ proposedFields: selectedFinding.proposedFields, source: allAttributesSource(selectedFinding) })}</code></pre><p>This is a starting point based on columns detected in the request. Add every column read by page rendering or business logic. After developers update and test the code, rescan to clear the All attributes finding.</p></div></> : <div className="blocker-panel"><strong>Field review required</strong><p>The request has no <code>$select</code> and returns the whole response object to its caller, so the auditor cannot safely determine which columns are consumed. Enter a reviewed explicit field list above; automatic primary-ID fallback is disabled.</p></div>)}
                     <h3>References ({selectedFinding.evidence.length})</h3>
                     <div className="evidence-list">{selectedFinding.evidence.map((evidence, index) => {

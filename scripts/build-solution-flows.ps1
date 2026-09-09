@@ -1,6 +1,6 @@
 param(
     [string]$SolutionSource = (Join-Path $PSScriptRoot "..\solution\PowerPagesWebApiFieldsAuditor\src"),
-    [string]$Version = "1.6.0.23"
+    [string]$Version = "1.6.0.24"
 )
 
 $ErrorActionPreference = "Stop"

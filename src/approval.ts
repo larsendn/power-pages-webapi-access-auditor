@@ -11,6 +11,14 @@ export function minimumExplicitFields(tableLogicalName: string): string {
   return LOGICAL_NAME.test(logicalName) ? `${logicalName}id` : ''
 }
 
-export function canApplyReviewedFields(confidence: 'high' | 'medium' | 'blocked', manualValue: string): boolean {
-  return confidence !== 'blocked' || Boolean(normalizeExplicitFields(manualValue))
+export function resolveExplicitFields(
+  confidence: 'high' | 'medium' | 'blocked',
+  requiresCodeChange: boolean,
+  manualValue: string,
+  proposedValue: string,
+  tableLogicalName: string,
+): string {
+  const reviewed = normalizeExplicitFields(manualValue)
+  if (confidence === 'blocked' && !requiresCodeChange) return reviewed
+  return reviewed || normalizeExplicitFields(proposedValue) || minimumExplicitFields(tableLogicalName)
 }

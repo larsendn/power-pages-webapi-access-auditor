@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canApplyReviewedFields, minimumExplicitFields, normalizeExplicitFields } from './approval'
+import { minimumExplicitFields, normalizeExplicitFields, resolveExplicitFields } from './approval'
 
 describe('manual explicit field approval', () => {
   it('normalizes a valid comma-separated logical-name list', () => {
@@ -17,10 +17,12 @@ describe('manual explicit field approval', () => {
     expect(minimumExplicitFields('bad/table')).toBe('')
   })
 
-  it('allows blocked findings only after an explicit field list is reviewed', () => {
-    expect(canApplyReviewedFields('blocked', '')).toBe(false)
-    expect(canApplyReviewedFields('blocked', '*')).toBe(false)
-    expect(canApplyReviewedFields('blocked', 'ssrs_name,ssrs_facilityid')).toBe(true)
-    expect(canApplyReviewedFields('high', '')).toBe(true)
+  it('allows all-column findings to use detected fields without changing code', () => {
+    expect(resolveExplicitFields('blocked', true, '', 'ssrs_name,ssrs_facilityid', 'ssrs_facility')).toBe('ssrs_facilityid,ssrs_name')
+    expect(resolveExplicitFields('blocked', true, 'ssrs_name,ssrs_city', 'ssrs_name', 'ssrs_facility')).toBe('ssrs_city,ssrs_name')
+  })
+
+  it('still requires manual fields for opaque requests without a select list', () => {
+    expect(resolveExplicitFields('blocked', false, '', 'ssrs_facilityid', 'ssrs_facility')).toBe('')
   })
 })

@@ -2,6 +2,19 @@
 
 Notable changes to the Power Pages Wildcard & Anonymous Access Auditor are recorded here. GitHub release packages and release-specific notes are available on the [Releases page](https://github.com/larsendn/power-pages-webapi-access-auditor/releases).
 
+## [1.6.0.24](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.24) - 2026-09-09
+
+### Fixed
+
+- **Select all results** now includes every wildcard setting, including settings whose code uses `$select=*` or FetchXML `<all-attributes />`.
+- All-column findings can apply and remotely verify the detected explicit field list without requiring a manual override first.
+- The apply action remains available for selected all-column findings while customer code remains unchanged.
+
+### Unchanged
+
+- Opaque requests with no detectable field usage still require a manually reviewed explicit field list.
+- All-column code findings remain visible until developers update and test the customer code and rescan.
+
 ## [1.6.0.23](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.23) - 2026-09-09
 
 ### Fixed
