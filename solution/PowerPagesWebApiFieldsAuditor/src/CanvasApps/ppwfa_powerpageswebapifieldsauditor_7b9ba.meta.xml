@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <CanvasApp xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Name>ppwfa_powerpageswebapifieldsauditor_7b9ba</Name>
-  <AppVersion>2026-09-09T14:13:25Z</AppVersion>
+  <AppVersion>2026-09-09T14:28:27Z</AppVersion>
   <Status>Ready</Status>
   <CreatedByClientVersion>0.0.0.0</CreatedByClientVersion>
   <MinClientVersion>0.0.0.0</MinClientVersion>
@@ -33,8 +33,8 @@
   <IsCustomizable>1</IsCustomizable>
   <CodeAppPackageUris>
     <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/index.html_ContentType_text/html</CodeAppPackageUri>
-    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-B88hoWhW.js_ContentType_application/javascript</CodeAppPackageUri>
-    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-DQ5eeB8Y.css_ContentType_text/css</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-BZEK-bDj.js_ContentType_application/javascript</CodeAppPackageUri>
+    <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/index-B6CNC1Bt.css_ContentType_text/css</CodeAppPackageUri>
     <CodeAppPackageUri>/CanvasApps/ppwfa_powerpageswebapifieldsauditor_7b9ba_CodeAppPackages/assets/power-pages-logo-BObTQX_1.png_ContentType_image/png</CodeAppPackageUri>
   </CodeAppPackageUris>
 </CanvasApp>

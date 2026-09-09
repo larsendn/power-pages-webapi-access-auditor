@@ -12,13 +12,12 @@ export function minimumExplicitFields(tableLogicalName: string): string {
 }
 
 export function resolveExplicitFields(
-  confidence: 'high' | 'medium' | 'blocked',
-  requiresCodeChange: boolean,
+  _confidence: 'high' | 'medium' | 'blocked',
+  _requiresCodeChange: boolean,
   manualValue: string,
   proposedValue: string,
   tableLogicalName: string,
 ): string {
   const reviewed = normalizeExplicitFields(manualValue)
-  if (confidence === 'blocked' && !requiresCodeChange) return reviewed
   return reviewed || normalizeExplicitFields(proposedValue) || minimumExplicitFields(tableLogicalName)
 }

@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.6.0.25",
+    [string]$Version = "1.6.0.27",
     [Parameter(Mandatory = $true)]
     [Guid]$SolutionId,
     [string]$SolutionUniqueName = "PowerPagesWebApiFieldsAuditor"

@@ -22,7 +22,8 @@ describe('manual explicit field approval', () => {
     expect(resolveExplicitFields('blocked', true, 'ssrs_name,ssrs_city', 'ssrs_name', 'ssrs_facility')).toBe('ssrs_city,ssrs_name')
   })
 
-  it('still requires manual fields for opaque requests without a select list', () => {
-    expect(resolveExplicitFields('blocked', false, '', 'ssrs_facilityid', 'ssrs_facility')).toBe('')
+  it('uses a primary-id fallback for opaque requests without detected fields', () => {
+    expect(resolveExplicitFields('blocked', false, '', '', 'incident')).toBe('incidentid')
+    expect(resolveExplicitFields('blocked', false, 'title,incidentid', '', 'incident')).toBe('incidentid,title')
   })
 })

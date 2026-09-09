@@ -2,6 +2,33 @@
 
 Notable changes to the Power Pages Wildcard & Anonymous Access Auditor are recorded here. GitHub release packages and release-specific notes are available on the [Releases page](https://github.com/larsendn/power-pages-webapi-access-auditor/releases).
 
+## [1.6.0.27](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.27) - 2026-09-09
+
+### Fixed
+
+- Corrected both Fluent UI reviewed-field inputs to read `data.value`, ensuring typed fields reach application state in the hosted Code App.
+- Restored automatic logical-table primary-ID replacement when no consumed fields can be detected, such as `contactid` or `incidentid`.
+- Manual overrides now update the normalized Explicit replacement and persist in saved review state before apply.
+
+### Verified
+
+- Typed `title,incidentid` into the incident setting and confirmed the submitted replacement became `incidentid,title` and the saved review retained the typed value.
+- Confirmed the empty incident setting defaults to `incidentid`, reports no missing fields, and enables apply without a manual override.
+
+## [1.6.0.26](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.26) - 2026-09-09
+
+### Fixed
+
+- Added **Apply this field setting and verify** directly beneath the selected Wildcard fields input.
+- Kept the bulk **Apply selected and verify** button enabled whenever one or more settings are selected, even while reviewed fields are missing.
+- Clicking either action with missing fields now displays the existing validation message instead of presenting a faint disabled control.
+- Clarified that placeholder field names are examples and are not submitted as reviewed values.
+
+### Verified
+
+- Recreated the reported state with four selected settings and zero ready field lists at `1549 x 768`; both submit buttons were visible and enabled.
+- Confirmed clicking the inline action with an empty field list blocks before the apply flow and displays the required-fields message.
+
 ## [1.6.0.25](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.25) - 2026-09-09
 
 ### Fixed
