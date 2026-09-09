@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { minimumExplicitFields, normalizeExplicitFields } from './approval'
+import { canApplyReviewedFields, minimumExplicitFields, normalizeExplicitFields } from './approval'
 
 describe('manual explicit field approval', () => {
   it('normalizes a valid comma-separated logical-name list', () => {
@@ -15,5 +15,12 @@ describe('manual explicit field approval', () => {
   it('provides a minimum primary-id allowlist for a logical table name', () => {
     expect(minimumExplicitFields('cr314_institutionsdata')).toBe('cr314_institutionsdataid')
     expect(minimumExplicitFields('bad/table')).toBe('')
+  })
+
+  it('allows blocked findings only after an explicit field list is reviewed', () => {
+    expect(canApplyReviewedFields('blocked', '')).toBe(false)
+    expect(canApplyReviewedFields('blocked', '*')).toBe(false)
+    expect(canApplyReviewedFields('blocked', 'ssrs_name,ssrs_facilityid')).toBe(true)
+    expect(canApplyReviewedFields('high', '')).toBe(true)
   })
 })

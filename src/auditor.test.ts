@@ -313,7 +313,7 @@ describe('browser analyzer', () => {
 
     expect(findings[0].confidence).toBe('blocked')
     expect(findings[0].evidence).toEqual(expect.arrayContaining([expect.objectContaining({ field: '*', source: '$select' })]))
-    expect(findings[0].blockers).toContain('An OData request uses $select=*. Replace it with an explicit $select field list, then rescan before removing the wildcard.')
+    expect(findings[0].blockers).toContain('An OData request uses $select=*. Apply a reviewed explicit site-setting list, then update customer code with an explicit $select field list and rescan.')
   })
 
   it('blocks every proposal when a dynamic Web API table cannot be associated', () => {

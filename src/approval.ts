@@ -10,3 +10,7 @@ export function minimumExplicitFields(tableLogicalName: string): string {
   const logicalName = tableLogicalName.trim()
   return LOGICAL_NAME.test(logicalName) ? `${logicalName}id` : ''
 }
+
+export function canApplyReviewedFields(confidence: 'high' | 'medium' | 'blocked', manualValue: string): boolean {
+  return confidence !== 'blocked' || Boolean(normalizeExplicitFields(manualValue))
+}

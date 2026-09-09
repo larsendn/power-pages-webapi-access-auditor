@@ -316,10 +316,10 @@ export function analyzeSite(settings: SiteSetting[], files: SourceFile[]): Table
       }
       if (matches.some((reference) => reference.usesAllAttributes)) {
         if (matches.some((reference) => reference.allAttributesSource === 'fetchxml')) {
-          blockers.push('FetchXML uses <all-attributes />. Replace it with explicit <attribute name="..." /> elements, then rescan before removing the wildcard.')
+          blockers.push('FetchXML uses <all-attributes />. Apply a reviewed explicit site-setting list, then update customer code with explicit <attribute name="..." /> elements and rescan.')
         }
         if (matches.some((reference) => reference.allAttributesSource === 'odata-select')) {
-          blockers.push('An OData request uses $select=*. Replace it with an explicit $select field list, then rescan before removing the wildcard.')
+          blockers.push('An OData request uses $select=*. Apply a reviewed explicit site-setting list, then update customer code with an explicit $select field list and rescan.')
         }
       }
       if (unresolvedReferences.length > 0) blockers.push(`${unresolvedReferences.length} Web API request${unresolvedReferences.length === 1 ? ' uses' : 's use'} a dynamic table name and could not be associated with a field setting.`)
