@@ -2,6 +2,18 @@
 
 Notable changes to the Power Pages Wildcard & Anonymous Access Auditor are recorded here. GitHub release packages and release-specific notes are available on the [Releases page](https://github.com/larsendn/power-pages-webapi-access-auditor/releases).
 
+## [1.6.0.25](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.25) - 2026-09-09
+
+### Fixed
+
+- Added **Apply field setting and verify** directly to the selected **All attributes** finding, where all-column code is reviewed.
+- The action displays the detected explicit replacement, accepts an optional override, applies the matching `Webapi/<table>/fields` setting, and remotely verifies the result.
+- After verification, the All attributes finding remains as a code issue but accurately reports that the matching setting is explicit.
+
+### Verified
+
+- Confirmed the action is visible and enabled in the All attributes detail at desktop and `390 x 844` mobile viewports.
+
 ## [1.6.0.24](https://github.com/larsendn/power-pages-webapi-access-auditor/releases/tag/v1.6.0.24) - 2026-09-09
 
 ### Fixed

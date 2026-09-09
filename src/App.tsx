@@ -378,6 +378,11 @@ function App() {
   const selectedUpdatedFinding = updatedFindings.find((finding) => finding.key === selectedUpdatedFindingKey)
   const [selectedAllAttributesFindingKey, setSelectedAllAttributesFindingKey] = useState(restoredWorkspace?.selectedAllAttributesFindingKey ?? '')
   const selectedAllAttributesFinding = allAttributesFindings.find((finding) => finding.key === selectedAllAttributesFindingKey)
+  const selectedAllAttributesWildcard = selectedAllAttributesFinding?.wildcardPresent
+    ? findings.find((finding) => finding.site.environment.id === selectedAllAttributesFinding.site.environment.id
+      && finding.site.id === selectedAllAttributesFinding.site.id
+      && finding.settingRecordId === selectedAllAttributesFinding.settingRecordId)
+    : undefined
   const [selectedAnonymousFindingKey, setSelectedAnonymousFindingKey] = useState(restoredWorkspace?.selectedAnonymousFindingKey ?? '')
   const selectedAnonymousFinding = anonymousFindings.find((finding) => finding.key === selectedAnonymousFindingKey)
   const wildcardSiteGroups = useMemo(() => {
@@ -888,12 +893,15 @@ function App() {
     setManualValues((current) => ({ ...current, [finding.key]: value }))
   }
 
-  async function applyApproved() {
-    if (selectedFieldsRequiredCount > 0) {
-      setNotice({ intent: 'warning', text: `Enter a valid explicit field list for ${selectedFieldsRequiredCount} selected wildcard setting${selectedFieldsRequiredCount === 1 ? '' : 's'} before applying.` })
+  async function applyApproved(requestedFindings?: FindingEntry[]) {
+    const fieldsRequiredCount = requestedFindings
+      ? requestedFindings.filter((finding) => !approvalValue(finding)).length
+      : selectedFieldsRequiredCount
+    if (fieldsRequiredCount > 0) {
+      setNotice({ intent: 'warning', text: `Enter a valid explicit field list for ${fieldsRequiredCount} selected wildcard setting${fieldsRequiredCount === 1 ? '' : 's'} before applying.` })
       return
     }
-    const approvedFindings = findings.filter((finding) => approved.has(finding.key) && approvalValue(finding))
+    const approvedFindings = requestedFindings ?? findings.filter((finding) => approved.has(finding.key) && approvalValue(finding))
     if (approvedFindings.length === 0) return
     setApplying(true)
     debugLogger.info('apply.started', { settingCount: approvedFindings.length })
@@ -942,6 +950,12 @@ function App() {
         debugLogger.info('apply.setting.verified', { settingId: finding.settingRecordId, wildcardPresent: verified.wildcardpresent })
         const updatedFinding = { ...finding, proposedValue: explicitValue, applyStatus: 'verified' as const, applyMessage: 'Remote value verified.' }
         setUpdatedFindings((current) => [...current, updatedFinding])
+        setAllAttributesFindings((current) => current.map((allAttributesFinding) =>
+          allAttributesFinding.site.environment.id === finding.site.environment.id
+            && allAttributesFinding.site.id === finding.site.id
+            && allAttributesFinding.settingRecordId === finding.settingRecordId
+            ? { ...allAttributesFinding, settingValue: explicitValue, wildcardPresent: false }
+            : allAttributesFinding))
         setSelectedUpdatedFindingKey((current) => current || finding.key)
         verifiedCount += 1
         nextFindings.splice(targetIndex, 1)
@@ -1096,7 +1110,7 @@ function App() {
                   <Button role="tab" aria-selected={reviewView === 'allAttributes'} appearance={reviewView === 'allAttributes' ? 'primary' : 'subtle'} onClick={() => setReviewView('allAttributes')}>All attributes ({allAttributesFindings.length})</Button>
                   <Button role="tab" aria-selected={reviewView === 'anonymous'} appearance={reviewView === 'anonymous' ? 'primary' : 'subtle'} onClick={() => setReviewView('anonymous')}>Anonymous table access ({anonymousFindings.length})</Button>
                 </div>
-                {reviewView === 'wildcards' && <div className="apply-bar"><span>{approved.size} wildcard change{approved.size === 1 ? '' : 's'} selected{selectedFieldsRequiredCount > 0 ? `; ${selectedFieldsRequiredCount} need fields` : ''}</span><Button icon={applying ? <Spinner size="tiny" /> : undefined} appearance="primary" disabled={approved.size === 0 || selectedFieldsRequiredCount > 0 || applying} aria-busy={applying} onClick={applyApproved}>{applying ? `Applying and verifying ${progress.current + 1} of ${progress.total}` : 'Apply selected and verify'}</Button></div>}
+                {reviewView === 'wildcards' && <div className="apply-bar"><span>{approved.size} wildcard change{approved.size === 1 ? '' : 's'} selected{selectedFieldsRequiredCount > 0 ? `; ${selectedFieldsRequiredCount} need fields` : ''}</span><Button icon={applying ? <Spinner size="tiny" /> : undefined} appearance="primary" disabled={approved.size === 0 || selectedFieldsRequiredCount > 0 || applying} aria-busy={applying} onClick={() => void applyApproved()}>{applying ? `Applying and verifying ${progress.current + 1} of ${progress.total}` : 'Apply selected and verify'}</Button></div>}
                 {reviewView === 'wildcards' && (findings.length > 0 ? <>
                   <div className="wildcard-selection-toolbar">
                     <div><strong>Select wildcard changes</strong><span>Select every result, then clear individual sites or settings that should not be updated.</span></div>
@@ -1224,6 +1238,10 @@ function App() {
                       <dt>Matched setting</dt><dd><code>{selectedAllAttributesFinding.settingName ?? 'No matching Web API fields setting found'}</code></dd>
                       <dt>Current setting value</dt><dd><code>{selectedAllAttributesFinding.settingValue ?? 'Not available'}</code></dd>
                     </dl>
+                    {selectedAllAttributesWildcard && <div className="all-attributes-setting-action">
+                      <div className="manual-fields"><label htmlFor="all-attributes-fields">Explicit replacement (optional override)</label><Input id="all-attributes-fields" value={manualValues[selectedAllAttributesWildcard.key] ?? ''} onChange={(event) => updateManualValue(selectedAllAttributesWildcard, event.currentTarget.value)} placeholder={selectedAllAttributesWildcard.proposedFields.join(',') || `${selectedAllAttributesWildcard.table}id`} disabled={applying} /><small>The detected explicit field list is ready to apply. Enter an override only when fields need to be added or removed.</small></div>
+                      <Button icon={applying ? <Spinner size="tiny" /> : undefined} appearance="primary" disabled={!approvalValue(selectedAllAttributesWildcard) || applying} aria-busy={applying} onClick={() => void applyApproved([selectedAllAttributesWildcard])}>{applying ? 'Applying and verifying...' : 'Apply field setting and verify'}</Button>
+                    </div>}
                     <MessageBar intent="warning"><MessageBarBody>This query still requests every column with <code>{allAttributesLabel(selectedAllAttributesFinding.source)}</code>{selectedAllAttributesFinding.wildcardPresent ? ', and its matching Web API field setting also contains a wildcard.' : '. It remains a code issue even though the matching Web API field setting is no longer a wildcard.'}</MessageBarBody></MessageBar>
                     <div className="code-suggestion"><div><strong>Suggested code replacement</strong><Button appearance="subtle" size="small" icon={<CopyRegular />} onClick={() => void navigator.clipboard.writeText(suggestedAllAttributesReplacement(selectedAllAttributesFinding))}>Copy suggestion</Button></div><pre><code>{suggestedAllAttributesReplacement(selectedAllAttributesFinding)}</code></pre><p>This is a starting point based on columns used by this query. Add every column consumed by page rendering or business logic. The auditor does not update customer code.</p></div>
                   </>

@@ -161,6 +161,9 @@ main { min-width: 0; padding: 32px clamp(24px, 4vw, 64px) 56px; }
 .manual-fields .fui-Input { width: 100%; }
 .manual-fields small { color: var(--muted); font-size: 11px; line-height: 1.4; }
 .manual-fields .fui-Input input::placeholder { color: #87929a; font-style: italic; }
+.all-attributes-setting-action { margin: 18px 0; display: grid; gap: 12px; }
+.all-attributes-setting-action .manual-fields { margin-top: 0; }
+.all-attributes-setting-action > .fui-Button { justify-self: start; }
 .finding-detail h3 { margin: 24px 0 10px; font: 700 15px/1.2 Georgia, 'Times New Roman', serif; }
 .blocker-panel { margin-top: 18px; padding: 14px; color: #6b4600; background: #fff6df; border-left: 3px solid var(--amber); }
 .blocker-panel p { margin: 7px 0 0; font-size: 12px; line-height: 1.45; }
@@ -220,6 +223,7 @@ main { min-width: 0; padding: 32px clamp(24px, 4vw, 64px) 56px; }
   .review-summary > div { padding-left: 0; border-left: 0; }
   .wildcard-selection-toolbar, .wildcard-site-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
   .primary-action-bar, .apply-bar { align-items: stretch; flex-direction: column; }
+  .all-attributes-setting-action > .fui-Button { width: 100%; }
   .undo-actions { justify-content: flex-start; }
   .undo-row { grid-template-columns: 1fr; padding-inline: 16px; }
   .undo-row > .fui-Button { grid-column: auto; justify-self: stretch; }
